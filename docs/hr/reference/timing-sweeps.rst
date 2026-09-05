@@ -55,7 +55,7 @@ ograničenja u istom routeu.
      - n/a
    * - ULX4M-LD 85F
      - Odabire workflow; zadano 40 MHz
-     - 75.01 MHz
+     - 60 MHz
      - 50 MHz
      - 250 MHz
      - 25 MHz
@@ -148,7 +148,7 @@ Parametri workflowa
    * - ``ulx4m_sys_clk_mhz``
      - 40
      - Hazard3 CPU/AHB takt za ULX4M-LD: 25, 40 ili 50 MHz. LiteDRAM user domena
-       ostaje zasebna na 75 MHz.
+       ostaje zasebna na 60 MHz.
    * - ``ulx4m_litedram_cpu``
      - ``serv``
      - CPU unutar generiranog LiteDRAM init jezgrenog modula: ``serv`` ili

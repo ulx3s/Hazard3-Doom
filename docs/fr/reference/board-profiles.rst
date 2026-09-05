@@ -22,9 +22,9 @@ Profils de cartes
      - Scanout SDRAM compact 320x200
    * - ULX4M-LD 85F
      - ``64m``
-     - DDR3L MT41K512M16HA-125 de 1 Gio ; ``ahb_litedram`` + LiteDRAM généré/``ECP5DDRPHY``
-     - CPU/AHB 40 MHz par défaut ; port utilisateur LiteDRAM 75 MHz
-     - Cible LiteDRAM ; dérogation de timing requise
+     - Profil DDR3/DDR3L Micron ``MT41K512M16HA`` ou Alliance ``AS4C256M16D3`` ; ``ahb_litedram`` + LiteDRAM généré/``ECP5DDRPHY``
+     - CPU/AHB 40 MHz ; port utilisateur LiteDRAM 60 MHz ; référence/init 25 MHz
+     - Micron qualifié sur le matériel ; profils générés propres au composant
    * - ULX4M-LS 85F
      - ``32m``
      - SDR SDRAM 16 bits de 32 Mio ; chemin du contrôleur natif ``ahb_sdram``
@@ -60,18 +60,18 @@ correspondant ; ces valeurs ne sont pas des garanties de timing portables :
      - ``clk_sys`` 42.11 MHz
      - PASS à 40 MHz
    * - ULX4M-LD 85F
-     - 232
-     - ``clk_sys`` 38.69 MHz ; LiteDRAM 62.52 MHz
-     - FAIL à 40 MHz / 75.01 MHz
+     - 2
+     - ``clk_sys`` 43.94 MHz ; port utilisateur LiteDRAM 67.81 MHz
+     - PASS à 40 MHz / 60 MHz et DDR qualifiée sur le matériel
 
-Le build ULX4M-LD utilise donc ``ALLOW_TIMING_FAILURE=1`` lorsqu'un bitstream
-de développement est nécessaire. Cette dérogation transforme les échecs de
-timing en avertissements signalés ; elle ne prétend pas que le timing est fermé.
-Relancez le timing routé après toute modification importante du RTL, du netlist,
-du seed ou de la chaîne d'outils. Le résultat ULX3S 85F est propre au modèle de
-timing sélectionné par le flux actuel du projet et ne doit pas être comparé
-directement à des exécutions utilisant un autre modèle de timing ECP5. Voir
-:doc:`timing-sweeps` pour la provenance des sweeps et les règles de comparaison.
+Le point de contrôle ULX4M-LD qualifié utilise un netlist figé, le seed 2 et
+HeAP ``timingweight=30``. Le bitstream testé sur le matériel a pour SHA256
+``294602982dfc4a9906961f2e8b6f43de925d8c11a7e5e6bb0f5e392965a868de``.
+La carte équipée de mémoire Micron a réussi la suite complète de qualification
+DDR, le stress du heap, le test Doom et l'exécution RV32 depuis la DDR. Un
+nouveau netlist doit être routé puis qualifié à nouveau ; un PASS de timing seul
+ne suffit pas. Voir :doc:`timing-sweeps` pour la provenance et les règles de
+comparaison.
 
 Bases principales des périphériques ULX3S
 -----------------------------------------

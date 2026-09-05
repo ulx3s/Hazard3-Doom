@@ -36,8 +36,9 @@ Les sorties importantes incluent :
 .. code-block:: text
 
    build/fpga_ulx3s.bit
-   build/hazard3-boot-monitor.elf
-   build/doom-image/hazard3-doom.h3d
+   build/ulx3s/monitor/hazard3-boot-monitor.elf
+   build/ulx3s/doom-image/hazard3-doom.h3d
+   build/ulx3s/hazard3-boot-monitor.hex
 
 3. Programmer le FPGA pour un essai
 -----------------------------------

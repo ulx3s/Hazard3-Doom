@@ -10,6 +10,31 @@ Ovaj odjeljak objašnjava procesor iz obrazovne perspektive i, jednako važno,
 odvaja **standardni Hazard3 dizajn** od **ULX3S/Hazard3-Doom integracije**
 izgrađene oko njega.
 
+
+Veza s Raspberry Pi RP2350
+--------------------------
+
+Hazard3 je također jedna od procesorskih arhitektura ugrađenih u Raspberry Pi
+RP2350 mikrokontroler. RP2350 sadrži dvije open-hardware Hazard3 RISC-V jezgre
+uz dvije Arm Cortex-M33 jezgre; softver ili OTP konfiguracija odabire koji se
+par procesora koristi. RP2350 je mikrokontroler koji se koristi na Raspberry Pi
+Pico 2 i Pico 2 W pločicama.
+
+Zbog toga je procesor u Hazard3-Doomu posebno zanimljiv za učenje: FPGA projekt
+koristi isti open-source Hazard3 procesorski dizajn koji se koristi i u serijski
+proizvedenom Raspberry Pi mikrokontroleru. To ipak ne znači da su dva
+sintetizirana CPU-a konfigurirana identično. Hazard3 je parametriziran, a RP2350
+uključuje drukčiji skup ISA ekstenzija, prilagođenih ekstenzija, debug značajki
+i SoC integracije od Hazard3-Doom FPGA konfiguracije opisane u nastavku.
+
+Korisne primarne reference:
+
+* `Raspberry Pi RP2350 stranica proizvoda <https://www.raspberrypi.com/products/rp2350/>`_
+* `Raspberry Pi RP2350 datasheet, odjeljak 3.8 Hazard3 processor <https://datasheets.raspberrypi.com/rp2350/rp2350-datasheet.pdf>`_
+* `Raspberry Pi Pico 2 stranica proizvoda <https://www.raspberrypi.com/products/raspberry-pi-pico-2/>`_
+* `Raspberry Pi dokumentacija mikrokontrolera - promjena arhitekture <https://www.raspberrypi.com/documentation/microcontrollers/microcontroller-chips.html#architecture-switching>`_
+* `Upstream Hazard3 izvor i bilješke o RP2350 konfiguraciji <https://github.com/Wren6991/Hazard3>`_
+
 Snimak izvornog koda koji ovaj projekt koristi
 ----------------------------------------------
 

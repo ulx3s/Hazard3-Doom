@@ -145,8 +145,8 @@ temporisations DRAM.
    * - ULX4M-LD 85F
      - DDR3 externe
      - ``ahb_litedram.v`` -> LiteDRAM généré -> ``ECP5DDRPHY``
-     - LiteDRAM utilise un port utilisateur à 75 MHz avec une interface Wishbone
-       128 bits tandis que Hazard3/AHB fonctionne à 50 MHz. L'adaptateur traverse
+     - LiteDRAM utilise un port utilisateur à 60 MHz avec une interface Wishbone
+       128 bits tandis que Hazard3/AHB fonctionne à 40 MHz. L'adaptateur traverse
        les domaines d'horloge une requête à la fois. Le firmware de démarrage
        effectue l'initialisation DDR3, le read leveling et un test mémoire avant
        d'autoriser les accès normaux.

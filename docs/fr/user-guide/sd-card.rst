@@ -3,6 +3,13 @@ Démarrage à froid depuis micro-SD
 
 Le démarrage depuis SD permet à une ULX3S programmée de repartir après une coupure complète d'alimentation et de lancer Doom sans PC de développement connecté.
 
+.. important::
+
+   Le démarrage micro-SD n'est actuellement pris en charge que sur les cibles
+   ULX3S. Sur ULX4M-LD, l'initialisation échoue à CMD0 et la commande de
+   démarrage SD du moniteur est désactivée ; l'ULX4M ne dispose pas non plus de
+   l'ESP32 présent sur l'ULX3S.
+
 Contenu de la carte
 -------------------
 

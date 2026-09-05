@@ -40,8 +40,9 @@ Important outputs include:
 .. code-block:: text
 
    build/fpga_ulx3s.bit
-   build/hazard3-boot-monitor.elf
-   build/doom-image/hazard3-doom.h3d
+   build/ulx3s/monitor/hazard3-boot-monitor.elf
+   build/ulx3s/doom-image/hazard3-doom.h3d
+   build/ulx3s/hazard3-boot-monitor.hex
 
 3. Program the FPGA for a test run
 ----------------------------------

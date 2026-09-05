@@ -72,17 +72,15 @@ The current ULX4M-LD checkpoint is substantially stronger than the older
    160c536b12e46667990c887571da6f443ccc6c5a2ba644033db43fc783ea9453
 
 The timing-passing hardware-qualified route used nextpnr seed 2 with HeAP
-``timingweight=30``, ``critexp=3``, and timing-driven rip-up enabled. The exact
-locally tested bitstream had SHA256:
+``timingweight=30``. The exact locally tested bitstream had SHA256:
 
 .. code-block:: text
 
    294602982dfc4a9906961f2e8b6f43de925d8c11a7e5e6bb0f5e392965a868de
 
-The same frozen netlist failed with the earlier default HeAP
-``timingweight=10``, ``critexp=2`` and no timing-driven rip-up, showing why the
-place-and-route settings are part of the qualification record rather than an
-incidental detail.
+The same frozen netlist failed with the earlier HeAP ``timingweight=10``
+setting, showing why the place-and-route settings are part of the qualification
+record rather than an incidental detail.
 
 Hardware validation on the Micron board then passed the complete ``q`` SDRAM
 qualification suite, 40 MiB heap stress, Doom platform smoke test, and copied

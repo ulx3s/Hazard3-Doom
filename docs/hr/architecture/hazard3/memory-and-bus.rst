@@ -150,8 +150,8 @@ kontrolere koji upravljaju refreshom i DRAM timingom.
    * - ULX4M-LD 85F
      - Vanjski DDR3
      - ``ahb_litedram.v`` -> generirani LiteDRAM -> ``ECP5DDRPHY``
-     - LiteDRAM koristi 75 MHz korisnički port sa 128-bitnim Wishbone sučeljem,
-       dok Hazard3/AHB radi na 50 MHz. Adapter prelazi između taktnih domena po
+     - LiteDRAM koristi 60 MHz korisnički port sa 128-bitnim Wishbone sučeljem,
+       dok Hazard3/AHB radi na 40 MHz. Adapter prelazi između taktnih domena po
        jedan zahtjev odjednom. Firmware za pokretanje izvodi DDR3 inicijalizaciju,
        read leveling i memorijski test prije omogućavanja normalnih pristupa.
 

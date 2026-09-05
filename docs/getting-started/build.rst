@@ -20,21 +20,20 @@ ULX3S 12F compact target, 32 MiB default, 40 MHz:
    ./scripts/build-ulx3s-12f-doom.sh
 
 ULX4M-LD 85F, 64 MiB software map, 40 MHz Hazard3 and 60 MHz LiteDRAM.
-The normal complete-build route is still an exploratory path:
+The normal complete-build route must close every required clock:
 
 .. code-block:: bash
 
-   ALLOW_TIMING_FAILURE=1 ./scripts/build-ulx4m-ld-doom.sh
+   ./scripts/build-ulx4m-ld-doom.sh
 
-Do not confuse that convenience build with the hardware-qualified route. The
-current qualified checkpoint closes timing with seed 2,
-``timingweight=30``, ``critexp=3``, and timing-driven rip-up, then passes the
-full DDR qualification suite on a Micron-populated ULX4M-LD. Use the sweep flow
-to reproduce/select a timing-passing bitstream. A complete rebuild changes the
-synthesized netlist when the resident monitor or generated LiteDRAM profile
-changes, so rerun the timing sweep and hardware tests rather than assuming seed
-2 remains valid. See :doc:`../reference/board-profiles` and
-:doc:`../reference/timing-sweeps`.
+The build defaults to seed 83 with HeAP ``timingweight=30``. The historical
+frozen seed-2 checkpoint also passed the full DDR qualification suite on a
+Micron-populated ULX4M-LD, but a complete rebuild changes the synthesized
+netlist when the resident monitor or generated LiteDRAM profile changes. Rerun
+the timing sweep and hardware tests for a release artifact rather than assuming
+the selected seed remains valid. ``ALLOW_TIMING_FAILURE=1`` is reserved for explicit
+ULX4M-LD sweep experiments, not release builds. See
+:doc:`../reference/board-profiles` and :doc:`../reference/timing-sweeps`.
 
 The 12F wrapper supports either a 32 MiB or 64 MiB SDRAM map, but defaults to
 32 MiB. If the 64 MiB map is selected, keep the monitor and Doom image matched:

@@ -19,16 +19,20 @@ Kompaktni cilj ULX3S 12F, zadano 32 MiB, 40 MHz:
 
    ./scripts/build-ulx3s-12f-doom.sh
 
-ULX4M-LD 85F, softverska mapa 64 MiB, Hazard3 na 40 MHz:
+ULX4M-LD 85F, softverska mapa 64 MiB, Hazard3 na 40 MHz i LiteDRAM na 60 MHz.
+Uobičajeni build mora zadovoljiti sva ograničenja takta:
 
 .. code-block:: bash
 
-   ALLOW_TIMING_FAILURE=1 ./scripts/build-ulx4m-ld-doom.sh
+   ./scripts/build-ulx4m-ld-doom.sh
 
-Trenutačni ULX4M-LD routing ima poznate timing promašaje za ``clk_sys`` i
-LiteDRAM. ``ALLOW_TIMING_FAILURE=1`` zadržava te promašaje vidljivima, ali
-omogućuje generiranje razvojnog bitstreama; ne čini da ograničenja prođu.
-Trenutačne rezultate provjere pogledajte u :doc:`../reference/board-profiles`.
+Build zadano koristi seed 83 s HeAP ``timingweight=30``. Povijesna, verzijski
+spremljena zamrznuta kontrolna točka seed 2 također je prošla potpunu DDR kvalifikaciju na
+ULX4M-LD pločici s Micron memorijom. Novi potpuni build ipak stvara novi
+netlist, pa za release artifact ponovno pokrenite timing sweep i hardverske
+testove. ``ALLOW_TIMING_FAILURE=1`` rezerviran je za izričite ULX4M-LD sweep
+eksperimente, a ne za release buildove. Pogledajte
+:doc:`../reference/board-profiles` i :doc:`../reference/timing-sweeps`.
 
 Omotna skripta za 12F podržava SDRAM mapu od 32 MiB ili 64 MiB, ali je zadana
 vrijednost 32 MiB. Ako odaberete mapu od 64 MiB, monitor i Doom slika moraju biti

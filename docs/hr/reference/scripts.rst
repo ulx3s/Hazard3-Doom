@@ -36,10 +36,10 @@ memorijsku mapu međusobno usklađenima.
 ``scripts/build-ulx4m-ld-doom.sh``
    Potpuni build za ULX4M-LD 85F. Koristi softversku mapu od 64 MiB pri 40 MHz i prije
    builda monitora, ugrađene boot slike, FPGA bitstreama i Doom slike provjerava
-   potrebne generirane LiteDRAM izvore. Trenutačni routed dizajn ima poznate
-   timing promašaje za ``clk_sys`` i LiteDRAM, pa koristite
-   ``ALLOW_TIMING_FAILURE=1`` kada namjerno generirate trenutačni razvojni
-   bitstream.
+   potrebne generirane LiteDRAM izvore. Release build zadano koristi seed 83 s
+   HeAP timingweightom 30 i mora zadovoljiti sva ograničenja takta. Novi netlist
+   mora se ponovno routati i hardverski kvalificirati. Koristite
+   ``ALLOW_TIMING_FAILURE=1`` samo za izričite ULX4M-LD sweep eksperimente.
 
 Primjeri:
 
@@ -47,7 +47,7 @@ Primjeri:
 
    ./scripts/build-ulx3s-doom.sh
    ./scripts/build-ulx3s-12f-doom.sh
-   ALLOW_TIMING_FAILURE=1 ./scripts/build-ulx4m-ld-doom.sh
+   ./scripts/build-ulx4m-ld-doom.sh
 
 Za testiranje drugog Hazard3 checkouta bez promjene Hazard3-Doom gitlinka:
 
@@ -80,9 +80,12 @@ Pomoćni alati za build monitora i bitstreama
 ``scripts/build-ecp5-bitstream-common.sh``
    Interna zajednička implementacija sinteze/place-and-routea koju koriste tri
    omotača za bitstream specifična za pločice. Uobičajeno se ne poziva izravno.
-   ``ALLOW_TIMING_FAILURE=1`` dopušta generiranje bitstreama uz zadržavanje
-   timing promašaja kao vidljivih upozorenja; koristite ga samo za namjerno
-   prihvaćenu razvojnu timing iznimku, poput trenutačnog ULX4M-LD cilja.
+   ``ALLOW_TIMING_FAILURE=1`` zadržava timing promašaje vidljivima tijekom
+   istraživačkog ULX4M-LD sweepa; nemojte ga koristiti za release build.
+
+   Sintetizirani JSON, logovi sinteze, oznake profila, routed izlazi i sweep
+   rezultati ostaju pod ``build/`` u glavnom repozitoriju. Hazard3 podmodul
+   pruža samo izvore i ograničenja.
 
 ``scripts/make-boot-hex.py``
    Pretvara binarnu datoteku monitora u heksadecimalnu inicijalizacijsku
@@ -90,8 +93,8 @@ Pomoćni alati za build monitora i bitstreama
 
 ``scripts/build-xpack.cmd``
    Native Windows build monitora koji koristi ``bin/riscv-gcc``. Argumenti su
-   ``[build|clean|rebuild] [64m|32m] [50000000|25000000]``. Bez argumenata
-   gradi monitor za 64 MiB/50 MHz.
+   ``[build|clean|rebuild] [64m|32m] [50000000|40000000|25000000]``. Bez
+   argumenata gradi monitor za 64 MiB/50 MHz.
 
 Pomoćni alati za Doom i Supercon build
 --------------------------------------
@@ -156,7 +159,8 @@ live timing monitor, watchdog limite, artifacts i A/B strategiju pogledajte
 
 ``scripts/sweep-ulx4m-ld.sh``
    ULX4M-LD routed seed sweep. Prihvaća jedan seed ili raspon seedova i zadano
-   koristi dva paralelna posla.
+   koristi dva paralelna posla. Rezultati se čuvaju pod
+   ``build/ulx4m-ld-seed-sweep/<clock>-<cpu><tuning>/``.
 
 ``scripts/sweep-ecp5.sh``
    Zajednički razdjelnik ciljeva za lokalne i GitHub Actions runove. Ispisuje
@@ -365,7 +369,8 @@ Higijena repozitorija i generirani inventar
    rezultirajući zapis indexa.
 
 ``scripts/check-nettype.sh``
-   Provjerava rukovanje Verilog ``default_nettype`` postavkom.
+   Provjerava ``default_nettype`` u projektnom RTL-u koji Git prati pod ``src/``
+   i ``tests/``. Izvori vanjskog bootloadera i podmodula nisu uključeni.
 
 ``scripts/inventory.sh``
    Inventarizira Git-praćene datoteke za zadani put i zapisuje deterministička

@@ -219,18 +219,31 @@ The current hardware-qualified LiteDRAM settings are:
    user port: 128-bit Wishbone
    cmd_buffer_depth: 2
    cmd_buffer_buffered: true
-   with_auto_precharge: false
+   with_auto_precharge: true
    initialization CPU: SERV for the qualified checkpoint
 
 ``cmd_buffer_depth=0`` was rejected during timing experiments because it
 created combinational-loop/timing problems. The qualified profile retains a
-depth of 2. ``with_auto_precharge`` remains ``false`` in the qualified
+depth of 2. ``with_auto_precharge`` remains ``true`` in the qualified
 configuration.
 
 The initialization CPU (for example SERV or VexRiscv) is part of the generated
 LiteDRAM core and does not change the ``ahb_litedram.v`` bus interface. Keep
 separate generated profiles so CPU type, DDR device, and user-clock frequency
 can be swept programmatically without hand-editing generated Verilog.
+
+The checked-in YAML profiles are the editable source for these generated cores.
+Select the physical RAM part number; one command regenerates both CPU variants:
+
+.. code-block:: bash
+
+   cd third_party/Hazard3/example_soc/third_party/LiteDRAM
+   ./regenerate-ulx4m.sh MT41K512M16HA
+   ./regenerate-ulx4m.sh AS4C256M16D3
+
+Each invocation replaces ``generated-serv/`` and ``generated-vexrisc/`` with
+the selected RAM profile. Confirm the ``ram_part`` recorded in each generated
+directory's ``LITEDRAM_VERSIONS.txt`` before building for a board.
 
 Hardware qualification is more than a nextpnr timing PASS. On the qualified
 Micron board, the monitor has passed all of the following against the 60 MHz

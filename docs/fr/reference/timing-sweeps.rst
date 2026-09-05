@@ -59,7 +59,7 @@ dans le même routage.
      - n/a
    * - ULX4M-LD 85F
      - Choisie par le workflow ; 40 MHz par défaut
-     - 75.01 MHz
+     - 60 MHz
      - 50 MHz
      - 250 MHz
      - 25 MHz
@@ -156,7 +156,7 @@ Paramètres du workflow
    * - ``ulx4m_sys_clk_mhz``
      - 40
      - Horloge système Hazard3 de l'ULX4M-LD : 25, 40 ou 50 MHz. Le domaine
-       utilisateur LiteDRAM reste séparé à 75 MHz.
+       utilisateur LiteDRAM reste séparé à 60 MHz.
    * - ``ulx4m_litedram_cpu``
      - ``serv``
      - CPU intégré au coeur d'initialisation LiteDRAM : ``serv`` ou ``vexrisc``.

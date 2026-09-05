@@ -35,13 +35,13 @@ memory map aligned.
 ``scripts/build-ulx4m-ld-doom.sh``
    Complete ULX4M-LD 85F build. It uses the 64 MiB software map at 40 MHz and
    checks the selected generated LiteDRAM sources before building the monitor,
-   embedded boot image, FPGA bitstream, and Doom image. The ordinary board build
-   route is not the same as the current hardware-qualified sweep checkpoint, so
-   ``ALLOW_TIMING_FAILURE=1`` may still be used for an exploratory complete
-   build. The qualified 40 MHz Hazard3 / 60 MHz LiteDRAM checkpoint is seed 2
-   with HeAP timingweight 30, critexp 3, and timing-driven rip-up. A fresh
-   complete build creates a new netlist and must be rerouted and
-   hardware-qualified; do not assume the historical seed remains valid.
+   embedded boot image, FPGA bitstream, and Doom image. The release build
+   defaults to seed 83 with HeAP timingweight 30 and must close every required
+   clock. The historical frozen 40 MHz Hazard3 / 60 MHz LiteDRAM seed-2
+   checkpoint is hardware-qualified. A fresh complete build creates a new netlist
+   and must be rerouted and hardware-qualified; do not assume the historical
+   seed remains valid. ``ALLOW_TIMING_FAILURE=1`` is for explicit ULX4M-LD
+   sweep experiments only.
 
 Examples:
 
@@ -49,7 +49,7 @@ Examples:
 
    ./scripts/build-ulx3s-doom.sh
    ./scripts/build-ulx3s-12f-doom.sh
-   ALLOW_TIMING_FAILURE=1 ./scripts/build-ulx4m-ld-doom.sh
+   ./scripts/build-ulx4m-ld-doom.sh
 
 To test another Hazard3 checkout without changing the Hazard3-Doom gitlink:
 
@@ -87,14 +87,19 @@ Monitor and bitstream build helpers
    is not a substitute for the current timing-passing ULX4M-LD sweep settings or
    hardware qualification.
 
+   Generated JSON, synthesis logs, profile stamps, routed outputs, and packaged
+   bitstreams are kept under the main repository's ignored ``build/``
+   directory. The Hazard3 submodule remains the source of Makefiles, RTL, and
+   constraints; build output is not retained beneath the submodule.
+
 ``scripts/make-boot-hex.py``
    Convert a monitor binary into the hexadecimal initialization file consumed by
    FPGA boot memory.
 
 ``scripts/build-xpack.cmd``
    Native Windows monitor build using ``bin/riscv-gcc``. Its arguments are
-   ``[build|clean|rebuild] [64m|32m] [50000000|25000000]``. With no arguments it
-   builds the 64 MiB/50 MHz monitor.
+   ``[build|clean|rebuild] [64m|32m] [50000000|40000000|25000000]``. With no
+   arguments it builds the 64 MiB/50 MHz monitor.
 
 Doom and Supercon build helpers
 -------------------------------
@@ -159,7 +164,8 @@ strategy, see :doc:`timing-sweeps`.
 
 ``scripts/sweep-ulx4m-ld.sh``
    ULX4M-LD routed seed sweep. Accepts a single seed or a seed range and defaults
-   to two concurrent jobs.
+   to two concurrent jobs. Results are retained under
+   ``build/ulx4m-ld-seed-sweep/<clock>-<cpu><tuning>/``.
 
 ``scripts/sweep-ecp5.sh``
    Shared target dispatcher used by local runs and GitHub Actions. It lists
@@ -180,6 +186,11 @@ strategy, see :doc:`timing-sweeps`.
    Final CI aggregation tool. It combines all seed-group results with the frozen
    sweep metadata/configuration, generates CSV and Markdown summaries, and
    checks sweep completeness.
+
+``scripts/generate-ecp5-seed-matrix.py``
+   Generate the grouped seed matrix used by GitHub Actions. Keeping this logic
+   in a standalone script makes the same validation available locally and
+   avoids embedding Python in workflow YAML.
 
 Examples:
 
@@ -356,6 +367,31 @@ CoreMark and ELF analysis
 Repository hygiene and generated inventory
 ------------------------------------------
 
+``scripts/test-scripts.sh``
+   Run Bash syntax and ShellCheck validation, Python compilation, optional
+   PowerShell parsing, generated seed-matrix checks, sweep-dispatch checks, and
+   repository-policy checks. With no options it avoids builds and hardware.
+   ``--integration`` additionally executes the complete builds and routed
+   sample sweeps for all three ECP5 targets. The sample defaults to two
+   target-specific timing-passing seeds: 11/178 for ULX3S 85F, 82/37 for ULX3S
+   12F, and 83/45 for ULX4M-LD. Use the target-specific
+   ``SCRIPT_TEST_*_SEEDS`` variables or ``SCRIPT_TEST_SWEEP_SEEDS`` to override
+   all three lists; ``SCRIPT_TEST_SWEEP_JOBS`` controls concurrency. A sweep
+   that completes without a timing-passing sampled seed is reported as a
+   warning, or as a failure when ``SCRIPT_TEST_REQUIRE_TIMING_PASS=1``.
+   Per-command logs are retained below
+   ``build/script-tests/integration-logs/``. The runner compares tracked state
+   before and after the integration run. Use
+   ``--integration --dry-run`` to inspect the long-running commands first.
+   Programming, OpenOCD, UART/GDB sessions, intentionally mutating checkout
+   operations, and destructive cleanup remain excluded from this test mode.
+
+.. code-block:: bash
+
+   ./scripts/test-scripts.sh
+   ./scripts/test-scripts.sh --integration --dry-run
+   ./scripts/test-scripts.sh --integration
+
 ``scripts/check-executable.sh``
    Verify that tracked shell scripts changed in recent commits carry the Git
    executable bit. The default window is the five most recent commits.
@@ -365,7 +401,9 @@ Repository hygiene and generated inventory
    index entry.
 
 ``scripts/check-nettype.sh``
-   Validate Verilog ``default_nettype`` handling.
+   Validate ``default_nettype`` handling in Git-tracked project RTL beneath
+   ``src/`` and ``tests/``. Vendored bootloader and submodule sources are not
+   included.
 
 ``scripts/inventory.sh``
    Inventory Git-tracked files for the requested path and write deterministic
