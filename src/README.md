@@ -19,6 +19,11 @@ Core resident monitor files:
 - `config.json`
 - `project.v`
 
+The detailed ULX3S Tiny Tapeout FPGA build flow, including the
+`ulx3s/tt-gds-action` GitHub Action, the `ulx3s/tt-support-tools` backend,
+local build commands, generated artifacts, UART mapping, and troubleshooting,
+is documented in `docs/getting-started/tiny-tapeout-ulx3s.rst`.
+
 ## ULX3S Chat and support
 
 ### Discord channel
@@ -31,4 +36,4 @@ Core resident monitor files:
 
 ### Email
 
-- [ulx3s.fpga@gmail.com](ulx3s.fpga@gmail.com) (If you do not use chats)
+- [ulx3s.fpga@gmail.com](mailto:ulx3s.fpga@gmail.com) (If you do not use chats)

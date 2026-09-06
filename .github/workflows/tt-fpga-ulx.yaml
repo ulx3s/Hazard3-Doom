@@ -15,6 +15,10 @@ on:
     # branches: none
   workflow_dispatch:
 
+permissions:
+  # explicit least-privilege setting for GITHUB_TOKEN, no write permissions needed
+  contents: read
+
 jobs:
   fpga-ice40:
     runs-on: ubuntu-24.04
@@ -25,7 +29,8 @@ jobs:
           submodules: recursive
 
       - name: FPGA bitstream for TT ASIC Sim (iCE40 UP5K)
-        uses: gojimmypi/tt-gds-action/fpga/ice40up5k@ulx3s
+        uses: ulx3s/tt-gds-action/fpga/ice40up5k@experimental
+
 
   fpga-ulx3s:
     runs-on: ubuntu-24.04
@@ -36,7 +41,7 @@ jobs:
           submodules: recursive
 
       - name: FPGA bitstream for TT ASIC Sim (ULX3S ECP5)
-        uses: gojimmypi/tt-gds-action/fpga/ulx3s@ulx3s
+        uses: ulx3s/tt-gds-action/fpga/ulx3s@experimental
         with:
           ecp5-device: 85k
           lpf: tt/fpga/ulx3s/ulx3s_v20.lpf

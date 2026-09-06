@@ -148,6 +148,7 @@ OUTPUT_PREFIX="${TARGET_DIR}/INVENTORY"
 TSV_OUT="${OUTPUT_PREFIX}.tsv"
 SHA_OUT="${OUTPUT_PREFIX}.sha256"
 MD_OUT="${OUTPUT_PREFIX}.md"
+TEMP_DIR="${REPO_ROOT}/build/inventory-tmp"
 
 find_sha256_tool()
 {
@@ -284,7 +285,8 @@ is_generated_output()
 
 make_temp_file()
 {
-    mktemp "${TARGET_DIR}/.inventory.XXXXXX"
+    mkdir -p -- "${TEMP_DIR}"
+    mktemp "${TEMP_DIR}/inventory.XXXXXX"
 }
 
 TSV_TMP="$(make_temp_file)"

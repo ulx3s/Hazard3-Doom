@@ -9,6 +9,12 @@ their own location, so they also work when launched from another directory.
 
 See the full Quick Start overview at https://ulx3s.github.io/ulx-doom/
 
+Sweep summaries:
+
+- [ULX3S-12F](./build-ulx3s-12f-sweep_summary.md)
+- [ULX3S-85F](./build-ulx3s-85f-sweep_summary.md)
+- [ULX4M-LD](./build-ulx4m-ld-sweep_summary.md)
+
 ## Quick Start
 
 Complete board builds:
@@ -16,13 +22,30 @@ Complete board builds:
 ```bash
 ./scripts/build-ulx3s-doom.sh
 ./scripts/build-ulx3s-12f-doom.sh
-ALLOW_TIMING_FAILURE=1 ./scripts/build-ulx4m-ld-doom.sh
+./scripts/build-ulx4m-ld-doom.sh
 ```
 
 The board wrappers build the monitor, FPGA bitstream, and Doom image with a
 matched memory/clock profile. Existing nonempty FPGA bitstreams may be reused
-where supported; set `FORCE_BITSTREAM_REBUILD=1` when a new synthesis and
-nextpnr run is required.
+where supported; set `FORCE_BITSTREAM_REBUILD=1` when a fresh route/bitstream is
+required. Normal bitstream builds synthesize before routing.
+
+For ULX4M-LD only, `SKIP_SYNTH=1` preserves and routes the existing synthesized
+`fpga_ulx4m_ld.json` instead of invoking Make/Yosys. Combine it with
+`FORCE_BITSTREAM_REBUILD=1` to reroute and repack a deliberately frozen netlist:
+
+```bash
+SKIP_SYNTH=1 \
+FORCE_BITSTREAM_REBUILD=1 \
+    ./scripts/build-ulx4m-ld-bitstream.sh
+```
+
+The frozen-netlist path requires the recorded system-clock and LiteDRAM-CPU
+profiles to match the requested build. It prints the JSON SHA256 before
+nextpnr and never deletes or replaces the JSON when a profile check fails.
+Synthesized JSON, synthesis logs, profile stamps, routed outputs, and sweep
+results are written below the main repository's ignored `build/` directory;
+the Hazard3 submodule supplies source files and constraints only.
 
 Current primary profiles are:
 
@@ -30,27 +53,27 @@ Current primary profiles are:
 | --- | --- | --- | --- |
 | ULX3S 85F | `64m` | 50 MHz | 320x200 default; extended modes optional |
 | ULX3S 12F | `32m` default, `64m` optional | 40 MHz | 320x200 compact SDRAM scanout |
-| ULX4M-LD 85F | `64m` | 50 MHz | 320x200 default |
+| ULX4M-LD 85F | `64m` | 40 MHz | 320x200 default |
 
 The monitor, FPGA configuration, Doom image, and SDRAM map must use compatible
 settings. Do not mix 32 MiB and 64 MiB software images.
 
-Current release validation uses seed 55 for ULX3S 85F and seed 65 for ULX3S
-12F; both meet their configured system-clock targets. ULX4M-LD seed 232 still
-misses both the 50 MHz ``clk_sys`` and 75.01 MHz LiteDRAM constraints, so the
-current development build requires ``ALLOW_TIMING_FAILURE=1``. The waiver keeps
-the misses visible and does not claim timing closure.
+The current build defaults are seed 11 for ULX3S 85F, seed `82` for ULX3S 12F,
+and seed `83` for ULX4M-LD. ULX4M-LD also defaults to `HeAP timingweight 30`, the
+simplest qualified setting from the 40/60 MHz ablation. These are convenience
+baselines, not permanent optima: rerun a seed sweep after placement-sensitive
+RTL, memory, video, clock, or toolchain changes.
 
 ## Build Scripts
 
 - `build.sh` - Builds the shared Hazard3 monitor firmware. Defaults to the 64 MiB map at 50 MHz; accepts `HAZARD3_MEMORY_PROFILE`, `HAZARD3_SYS_CLK_HZ`, `HAZARD3_BUILD_DIR`, `TOOLCHAIN_PREFIX`, and `HAZARD3_MONITOR_LINKER_SCRIPT` overrides.
 - `build-ecp5-bitstream-common.sh` - Internal shared ECP5 synthesis/place-and-route implementation used by the board-specific bitstream wrappers. Normally do not invoke it directly.
 - `build-ulx3s-85f-bitstream.sh` - ULX3S 85F entry point for the shared ECP5 flow.
-- `build-ulx3s-doom.sh` - Complete ULX3S 85F build: monitor, boot image, FPGA bitstream, Doom image, and SD-card staging files.
+- `build-ulx3s-doom.sh` - Complete ULX3S 85F build: monitor, boot image, FPGA bitstream, Doom image, and SD-card staging files under `build/ulx3s/`.
 - `build-ulx3s-12f-bitstream.sh` - ULX3S 12F entry point for the shared ECP5 flow. Defaults to `HAZARD3_MEMORY_PROFILE=32m`.
 - `build-ulx3s-12f-doom.sh` - Complete ULX3S 12F build. Uses a 40 MHz Hazard3 clock, defaults to the 32 MiB map, and intentionally accepts only `HAZARD3_DOOM_HDMI_RESOLUTION=320x200`.
-- `build-ulx4m-ld-bitstream.sh` - ULX4M-LD 85F entry point for the shared ECP5 flow.
-- `build-ulx4m-ld-doom.sh` - Complete ULX4M-LD 85F build using the 64 MiB map at 50 MHz, including LiteDRAM inputs and the embedded resident monitor. The current development route requires `ALLOW_TIMING_FAILURE=1` because the system and LiteDRAM timing constraints are not yet closed.
+- `build-ulx4m-ld-bitstream.sh` - ULX4M-LD 85F entry point for the shared ECP5 flow. Supports `SKIP_SYNTH=1` for routing an existing frozen JSON without invoking Make/Yosys.
+- `build-ulx4m-ld-doom.sh` - Complete ULX4M-LD 85F build using the 64 MiB map at 40 MHz, including LiteDRAM inputs and the embedded resident monitor under `build/ulx4m-ld/`. The default route uses seed 83 with HeAP timingweight 30.
 - `build-xpack.cmd` - Native Windows monitor build using the repository xPack RISC-V GCC installation. Supports `build`, `clean`, and `rebuild` plus memory-profile and clock arguments.
 - `make-boot-hex.py` - Converts the monitor binary into the hexadecimal initialization format consumed by FPGA boot memory.
 
@@ -100,24 +123,88 @@ Changing the requested profile invalidates incompatible synthesized output.
 ## Seed Sweep and Timing Scripts
 
 Placement-only sweeps are ranking aids. Routed sweeps are authoritative for
-final timing and produce bitstreams.
+final timing. The common routed-sweep entry point is `sweep-ecp5.sh`; it
+dispatches to the board-specific implementation so local runs and GitHub
+Actions use the same routing code.
 
-- `sweep-peek.sh` - ULX3S 85F placement-only sweep. With no seed it scans the configured seed range; an explicit seed limits the run. `SWEEP_JOBS` controls concurrent placements and `HAZARD3_HDMI_EXTENDED_MODES` selects the 85F video profile.
-- `sweep.sh` - ULX3S 85F full routed sweep. Accepts explicit seeds, comma-separated seeds, or `--all`; `SWEEP_JOBS` controls concurrent routes. Results and bitstreams are retained under `build/ulx3s-seed-sweep/`.
-- `sweep-peek-ulx3s-12f.sh` - ULX3S 12F placement-only sweep. Accepts explicit seeds or `--all`, defaults to four concurrent jobs and the 32 MiB profile, and writes under `build/ulx3s-12f-placement-sweep/<profile>/`.
-- `sweep-ulx3s-12f.sh` - ULX3S 12F full routed sweep. Accepts explicit seeds or `--all`, defaults to four concurrent jobs and the 32 MiB profile, and writes routed results and bitstreams under `build/ulx3s-12f-seed-sweep/<profile>/`.
-- `sweep-peek-ulx3s-12f-best-peek.sh` - Convenience helper that takes the strongest 12F placement candidates and launches a smaller routed follow-up sweep.
-- `sweep-ulx4m-ld.sh` - ULX4M-LD routed seed sweep. Accepts one seed or a seed range and defaults to two concurrent jobs.
+Supported routed targets:
+
+```text
+ulx3s-85f
+ulx3s-12f
+ulx4m-ld-85f
+```
 
 Examples:
 
 ```bash
-SWEEP_JOBS=8 ./scripts/sweep-peek.sh
-SWEEP_JOBS=8 ./scripts/sweep.sh --all
-SWEEP_JOBS=30 ./scripts/sweep-peek-ulx3s-12f.sh --all
-SWEEP_JOBS=30 ./scripts/sweep-ulx3s-12f.sh --all
-./scripts/sweep-ulx4m-ld.sh 1-32
+./scripts/sweep-ecp5.sh ulx3s-85f 178
+SWEEP_JOBS=8 ./scripts/sweep-ecp5.sh ulx3s-85f --all
+
+HAZARD3_MEMORY_PROFILE=32m \
+SWEEP_JOBS=8 \
+    ./scripts/sweep-ecp5.sh ulx3s-12f 1-64
+
+HAZARD3_ULX4M_SYS_CLK_MHZ=40 \
+ULX4M_LITEDRAM_CPU=serv \
+SWEEP_JOBS=8 \
+    ./scripts/sweep-ecp5.sh ulx4m-ld-85f 48,130,176,223
 ```
+
+The target-specific scripts remain directly usable:
+
+- `sweep-ulx3s-85f.sh` - ULX3S 85F full routed sweep.
+- `sweep.sh` - backward-compatible alias for `sweep-ulx3s-85f.sh`.
+- `sweep-ulx3s-12f.sh` - ULX3S 12F full routed sweep.
+- `sweep-ulx4m-ld.sh` - ULX4M-LD 85F full routed sweep.
+- `sweep-peek.sh` - ULX3S 85F placement-only prescreen.
+- `sweep-peek-ulx3s-12f.sh` - ULX3S 12F placement-only prescreen.
+- `sweep-peek-ulx3s-12f-best-peek.sh` - routes selected strong 12F placement candidates.
+
+All routed targets accept explicit seeds, comma-separated seeds, ranges such as
+`1-32`, or `--all`. `SWEEP_JOBS` controls local concurrency. Each target writes
+`metadata.txt`, per-seed result CSV files, and an aggregate results CSV. The
+ULX3S targets also retain routed bitstreams locally. ULX4M-LD results are under
+`build/ulx4m-ld-seed-sweep/<clock>-<cpu><tuning>/`.
+
+Each nextpnr route is limited by `SWEEP_ROUTE_TIMEOUT_SECONDS`, which defaults
+to 7200 seconds. `SWEEP_ROUTE_KILL_AFTER_SECONDS` defaults to 30 seconds and
+allows a route that ignores `SIGTERM` to be killed. A timed-out route is
+recorded with `timing_status=TIMEOUT` and the sweep continues with the remaining
+seeds; it is not treated as a tool failure. For example:
+
+```bash
+SWEEP_ROUTE_TIMEOUT_SECONDS=900 \
+    ./scripts/sweep-ecp5.sh ulx3s-85f 1-32
+```
+
+The GitHub seed-sweep workflow also applies a 720-second whole-seed watchdog
+around each `sweep-ecp5.sh` invocation. This is a second safety net for hangs
+outside nextpnr itself; the normal nextpnr timeout should fire first.
+
+Common optional nextpnr tuning is available on every routed target:
+
+```bash
+SWEEP_NEXTPNR_PLACER=heap
+SWEEP_NEXTPNR_ROUTER=router2
+SWEEP_NEXTPNR_HEAP_TIMINGWEIGHT=30
+SWEEP_NEXTPNR_HEAP_CRITEXP=3
+SWEEP_NEXTPNR_TMG_RIPUP=1
+SWEEP_NEXTPNR_ROUTER2_ALT_WEIGHTS=1
+SWEEP_NEXTPNR_EXTRA_ARGS='...'
+```
+
+The GitHub workflow `.github/workflows/ulx4m-ld-seed-sweep.yml` is now a
+parameterized ECP5 seed-sweep workflow despite the retained historical filename.
+Select the target and seed range with `workflow_dispatch`. The prepare job
+synthesizes one frozen netlist; route jobs use `SWEEP_SKIP_SYNTH=1` against that
+exact netlist, and the final summary is generated by
+`summarize-ecp5-sweep.py`. Synthesis and routing OSS CAD Suite snapshots can be
+selected independently for nextpnr A/B testing.
+
+`SWEEP_PREPARE_ONLY=1` and `SWEEP_SKIP_SYNTH=1` are primarily CI plumbing, but
+they are also useful for controlled local experiments where multiple routes
+must use exactly the same synthesized JSON.
 
 Run a new routed sweep whenever the FPGA netlist changes materially. A seed that
 was optimal for an earlier design is not expected to remain optimal after EBR,
@@ -187,7 +274,34 @@ The `gdb/` directory contains focused command scripts for monitor and SAO tests:
 
 - `check-executable.sh` - Checks recently changed tracked shell scripts for the Git executable bit; defaults to the most recent five commits.
 - `git-exe.sh` - Sets the Git executable bit for one tracked file and prints the resulting index entry.
-- `check-nettype.sh` - Checks Verilog sources for consistent `default_nettype` handling.
+- `check-nettype.sh` - Checks Git-tracked project RTL in `src/` and `tests/` for consistent `default_nettype` handling; vendored bootloader and submodule sources are excluded.
+- `generate-ecp5-seed-matrix.py` - Generates grouped seed jobs for the ECP5 sweep workflow without embedding Python in workflow YAML.
+- `test-scripts.sh` - Runs syntax, lint, and safe smoke checks across the top-level Bash, Python, PowerShell, Windows command, and GDB script files. Add `--integration` to execute complete board builds and routed two-seed samples for every ECP5 target. Integration logs and isolated software products are written below `build/script-tests/`; normal FPGA and sweep products remain below `build/`. Hardware programming, UART/GDB sessions, intentionally mutating checkout operations, and destructive cleanup are excluded. The runner verifies that tracked repository and submodule state is unchanged.
+
+Fast validation and the longer integration sample are separate:
+
+```bash
+./scripts/test-scripts.sh
+./scripts/test-scripts.sh --integration
+./scripts/test-scripts.sh --integration --dry-run
+```
+
+The integration sample defaults to board-specific timing-passing seeds: `11` and
+`178` for ULX3S 85F, `82` and `37` for ULX3S 12F, and 83 and 45 for ULX4M-LD. Override
+one list with `SCRIPT_TEST_ULX3S_85F_SEEDS`,
+`SCRIPT_TEST_ULX3S_12F_SEEDS`, or `SCRIPT_TEST_ULX4M_LD_SEEDS`.
+`SCRIPT_TEST_SWEEP_SEEDS` overrides all three lists, and
+`SCRIPT_TEST_SWEEP_JOBS` sets route concurrency. For example:
+
+```bash
+SCRIPT_TEST_SWEEP_SEEDS="11 178" \
+SCRIPT_TEST_SWEEP_JOBS=2 \
+    ./scripts/test-scripts.sh --integration
+```
+
+A completed sweep with no timing-passing sampled seed is a warning, not a
+PASS. Set `SCRIPT_TEST_REQUIRE_TIMING_PASS=1` to make that condition fail the
+test run.
 - `check-windows-visualgdb.ps1` - Validates the native-Windows VisualGDB/NMake configuration and expected xPack monitor build commands.
 - `check-wsl-visualgdb.ps1` - Validates the WSL VisualGDB bridge, expected build/debug paths, and LF-only tracked shell scripts.
 - `inventory.sh` - Inventories Git-tracked files in the selected path and writes deterministic Markdown, TSV, and SHA-256 reports. It intentionally uses Git's index instead of walking ignored/untracked toolchains.

@@ -23,7 +23,7 @@ from datetime import datetime
 project = "Hazard3-Doom"
 author = "Hazard3-Doom contributors"
 copyright = f"{datetime.now().year}, {author}"
-release = "develop"
+release = os.environ.get("READTHEDOCS_VERSION", "develop")
 version = release
 
 extensions = []
@@ -80,7 +80,7 @@ html_context = {
     "display_github": True,
     "github_user": "gojimmypi",
     "github_repo": "Hazard3-Doom",
-    "github_version": "develop",
+    "github_version": os.environ.get("READTHEDOCS_GIT_IDENTIFIER", "develop"),
     "conf_py_path": (
         f"/docs/{translation_language}/" if translation_name is not None else "/docs/"
     ),

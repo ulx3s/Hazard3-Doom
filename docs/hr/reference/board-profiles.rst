@@ -3,28 +3,33 @@ Profili pločica
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 25 20 25
+   :widths: 18 16 28 14 24
 
    * - Pločica
      - Memorijski profil
+     - Vanjska memorija/kontroler
      - Sistemski takt
      - Napomena o videu/buildu
    * - ULX3S 85F
      - ``64m``
+     - 16-bitni SDR SDRAM; izvorni ``ahb_sdram`` put kontrolera
      - 50 MHz
      - 320x200 zadano; dostupni su prošireni načini
    * - ULX3S 12F
      - ``32m`` zadano; ``64m`` opcionalno
+     - 16-bitni SDR SDRAM; izvorni ``ahb_sdram`` put kontrolera
      - 40 MHz
      - Kompaktni 320x200 SDRAM scanout
    * - ULX4M-LD 85F
      - ``64m``
-     - 50 MHz
-     - LiteDRAM cilj; potrebna timing iznimka
+     - Micron ``MT41K512M16HA`` ili Alliance ``AS4C256M16D3`` DDR3/DDR3L profil; ``ahb_litedram`` + generirani LiteDRAM/``ECP5DDRPHY``
+     - 40 MHz CPU/AHB; 60 MHz LiteDRAM korisnički port; 25 MHz referenca/init
+     - Micron hardverski kvalificiran; generirani profili specifični za komponentu
    * - ULX4M-LS 85F
      - ``32m``
-     - Dokumentirani profil od 50 MHz
-     - Referenca memorijskog profila
+     - 32 MiB 16-bitni SDR SDRAM; izvorni ``ahb_sdram`` put kontrolera
+     - 50 MHz
+     - Izvorni SDR memorijski put
 
 Monitor, povezana Doom slika i SDRAM memorijska mapa moraju se slagati oko
 memorijskog profila. Potpuni omotači za build pločica automatski postavljaju
@@ -33,9 +38,10 @@ profil i takt specifičan za cilj.
 Trenutačna FPGA provjera
 ------------------------
 
-Trenutačno izdanje lokalno je ponovno izgrađeno iz prikvačenog Hazard3 stabla
-uz Yosys 0.60+70 i zadane seedove pločica. Ovi routed rezultati služe kao
-regresijske kontrolne točke, a ne kao prijenosna jamstva timinga:
+Routed vrijednosti ispod regresijske su kontrolne točke iz projektnih buildova.
+Točne revizije izvora, SHA256 netlista, verzije CAD alata i sweep parametre treba
+uzeti iz odgovarajućeg build/sweep artifacta; ove vrijednosti nisu prijenosna
+jamstva timinga:
 
 .. list-table::
    :header-rows: 1
@@ -54,16 +60,17 @@ regresijske kontrolne točke, a ne kao prijenosna jamstva timinga:
      - ``clk_sys`` 42.11 MHz
      - PASS pri 40 MHz
    * - ULX4M-LD 85F
-     - 232
-     - ``clk_sys`` 43.78 MHz; LiteDRAM 64.65 MHz
-     - FAIL pri 50 MHz / 75.01 MHz
+     - 2
+     - ``clk_sys`` 43.94 MHz; LiteDRAM korisnički port 67.81 MHz
+     - PASS pri 40 MHz / 60 MHz i hardverski kvalificiran DDR
 
-ULX4M-LD build zato koristi ``ALLOW_TIMING_FAILURE=1`` kada je potreban razvojni
-bitstream. Ta iznimka pretvara timing greške u prijavljena upozorenja; ne tvrdi
-da je timing zatvoren. Ponovno pokrenite routed timing nakon značajnih promjena
-RTL-a, netlista, seeda ili toolchaina. Rezultat ULX3S 85F specifičan je za timing
-model koji odabire trenutačni projektni tijek i ne treba ga izravno uspoređivati
-s pokretanjima koja odabiru drugi ECP5 timing model.
+Kvalificirana ULX4M-LD kontrolna točka koristi zamrznuti netlist, seed 2 i HeAP
+``timingweight=30``. Hardverski testirani bitstream ima SHA256
+``294602982dfc4a9906961f2e8b6f43de925d8c11a7e5e6bb0f5e392965a868de``.
+Pločica s Micron memorijom prošla je potpunu DDR kvalifikaciju, heap stress,
+Doom test i RV32 izvođenje iz DDR-a. Novi netlist mora se ponovno routati i
+hardverski kvalificirati; sam timing PASS nije dovoljan. Pogledajte
+:doc:`timing-sweeps` za provenance sweepa i pravila usporedbe.
 
 Glavne baze ULX3S periferije
 ----------------------------

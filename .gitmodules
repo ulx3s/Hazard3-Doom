@@ -11,9 +11,7 @@
 #
 # Fetch the intended Hazard3 integration branch:
 #
-# git -C third_party/Hazard3 fetch \
-# https://github.com/ulx3s/Hazard3.git \
-# ulx-doom
+# git -C third_party/Hazard3 fetch https://github.com/ulx3s/Hazard3.git ulx-doom
 #
 # Confirm the fetched revision before switching:
 #
@@ -36,8 +34,13 @@
 # Confirm the Hazard3 and libfpga revisions:
 #
 # git -C third_party/Hazard3 log -1 --oneline
+#
+# Currently: 3c0aca0 (HEAD) Merge pull request #9 from gojimmypi/ulx-doom-dev
+#
 # git -C third_party/Hazard3 rev-parse HEAD:example_soc/libfpga
 # git -C third_party/Hazard3/example_soc/libfpga rev-parse HEAD
+#
+# Currently: 2c430246892d52c41c610bfdb2afc88992986e00
 #
 # Confirm all nested submodules match their recorded gitlinks:
 #

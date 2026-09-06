@@ -4,8 +4,8 @@
 # Path:        scripts/sweep-ulx3s-12f.sh
 #
 # Project:     Hazard3-Doom
-# Purpose:     Run fully routed ULX3S 12F nextpnr seed sweeps and record
-#              final timing results.
+# Purpose:     Run fully routed ULX3S 12F nextpnr seed sweeps and record final
+#              timing results.
 #
 # Copyright (c) 2026 gojimmypi
 #
@@ -18,27 +18,35 @@
 # See LICENSING.md for project licensing policy and scope.
 # -----------------------------------------------------------------------------
 
-# File: scripts/sweep-ulx3s-12f.sh
-#
-# Route ULX3S 12F nextpnr seeds against one synthesized compact-profile
-# netlist and record final routed clock timing. The netlist and LPF are
-# read-only inputs while seed-specific routes may run concurrently.
-
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 HAZARD3_ROOT="${HAZARD3_ROOT:-${REPO_ROOT}/third_party/Hazard3}"
 SYNTH_DIR="${HAZARD3_ROOT}/example_soc/synth"
+BUILD_DIR="${REPO_ROOT}/build"
+COMMON_SCRIPT="${SCRIPT_DIR}/sweep-ecp5-common.sh"
 SWEEP_JOBS="${SWEEP_JOBS:-4}"
+SWEEP_SKIP_SYNTH="${SWEEP_SKIP_SYNTH:-0}"
+SWEEP_PREPARE_ONLY="${SWEEP_PREPARE_ONLY:-0}"
 HAZARD3_MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE:-32m}"
 
-NETLIST="${SYNTH_DIR}/fpga_ulx3s_12f.json"
+NETLIST="${BUILD_DIR}/fpga_ulx3s_12f.json"
 LPF="${SYNTH_DIR}/fpga_ulx3s.lpf"
 MAKEFILE="${SYNTH_DIR}/ULX3S_12F.mk"
-SYNTH_LOG="${SYNTH_DIR}/synth.log"
-SYNTH_PROFILE_STAMP="${SYNTH_DIR}/fpga_ulx3s_12f.memory-profile"
-SWEEP_DIR="${REPO_ROOT}/build/ulx3s-12f-seed-sweep/${HAZARD3_MEMORY_PROFILE}"
+SYNTH_LOG="${BUILD_DIR}/fpga_ulx3s_12f.synth.log"
+SYNTH_PROFILE_STAMP="${BUILD_DIR}/fpga_ulx3s_12f.memory-profile"
+SYNTH_DURATION_STAMP="${BUILD_DIR}/fpga_ulx3s_12f.synth-seconds"
+
+# shellcheck source=scripts/sweep-ecp5-common.sh
+# shellcheck disable=SC1091
+source "${COMMON_SCRIPT}"
+printf 'Include source: %s\n' "${COMMON_SCRIPT}" >&2
+
+sweep_ecp5_init_tuning
+TUNING_SUFFIX="$(sweep_ecp5_tuning_suffix)"
+SWEEP_DIR="${BUILD_DIR}/ulx3s-12f-seed-sweep/${HAZARD3_MEMORY_PROFILE}${TUNING_SUFFIX}"
+SWEEP_REL_DIR="${SWEEP_DIR#"${REPO_ROOT}"/}"
 
 usage()
 {
@@ -52,264 +60,177 @@ Route one or more nextpnr seeds for the ULX3S 12F Hazard3-Doom build.
 Seeds must be decimal values from 1 through 260.
 SWEEP_JOBS=N runs up to N routes concurrently (default: 4).
 HAZARD3_MEMORY_PROFILE=32m|64m selects the SDRAM profile (default: 32m).
-
-Examples:
-    $0 55
-    $0 1 12 26 33 46 55
-    $0 1,12,26,33,46,55
-    $0 1-32
-    SWEEP_JOBS=8 $0 --all
+SWEEP_SKIP_SYNTH=1 routes an already-frozen synthesized netlist.
+SWEEP_ROUTE_TIMEOUT_SECONDS=N limits each nextpnr route (default: 7200).
 EOF_USAGE
 }
 
-require_tool()
-{
-    local tool="$1"
+# Run ShellCheck when available.
+MY_SHELLCHECK="${MY_SHELLCHECK:-shellcheck}"
 
-    command -v "${tool}" >/dev/null 2>&1 || {
-        echo "Missing required tool: ${tool}" >&2
-        exit 1
-    }
-}
+if command -v "${MY_SHELLCHECK}" >/dev/null 2>&1; then
+    (
+        cd -- "${REPO_ROOT}"
+        "${MY_SHELLCHECK}" -x "scripts/$(basename -- "${BASH_SOURCE[0]}")"
+    ) || exit 1
+else
+    echo "${MY_SHELLCHECK} is not installed. Please install it if changes to this script have been made."
+fi
 
-require_file()
-{
-    local path="$1"
+if (( $# == 1 )) && [[ "$1" == "--print-sweep-dir" ]]; then
+    printf '%s\n' "${SWEEP_REL_DIR}"
+    exit 0
+fi
 
-    [[ -f "${path}" ]] || {
-        echo "Missing required file: ${path}" >&2
-        exit 1
-    }
-}
+case "${SWEEP_SKIP_SYNTH}" in
+0|1) ;;
+*) echo "SWEEP_SKIP_SYNTH must be 0 or 1." >&2; exit 1 ;;
+esac
+case "${SWEEP_PREPARE_ONLY}" in
+0|1) ;;
+*) echo "SWEEP_PREPARE_ONLY must be 0 or 1." >&2; exit 1 ;;
+esac
+if [[ ! "${SWEEP_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Invalid SWEEP_JOBS: ${SWEEP_JOBS}; expected a positive integer." >&2
+    exit 1
+fi
+case "${HAZARD3_MEMORY_PROFILE}" in
+32m|64m) ;;
+*) echo "HAZARD3_MEMORY_PROFILE must be 32m or 64m." >&2; exit 1 ;;
+esac
 
-append_seed()
-{
-    local seed_value="$1"
+printf 'ULX3S 12F sweep configuration: system clock=40 MHz, SDRAM profile=%s\n' \
+    "${HAZARD3_MEMORY_PROFILE}"
 
-    if (( seed_value < 1 || seed_value > 260 )); then
-        echo "Invalid seed: ${seed_value}; expected a decimal value from 1 through 260." >&2
+if [[ "${SWEEP_PREPARE_ONLY}" != "1" ]]; then
+    if (( $# == 0 )); then
         usage
         exit 1
     fi
-
-    if [[ -z "${seen_seeds[${seed_value}]+x}" ]]; then
-        seeds+=("${seed_value}")
-        seen_seeds["${seed_value}"]=1
-    fi
-}
-
-extract_clock()
-{
-    local log="$1"
-    local clock="$2"
-    local value
-
-    # nextpnr reports timing after placement and again after routing. Keep the
-    # final match so the CSV contains routed, not placement-only, timing.
-    value="$(
-        grep "Max frequency for clock.*${clock}" "${log}" 2>/dev/null |
-            tail -n 1 |
-            sed -E 's/.*: ([0-9.]+) MHz.*/\1/' || true
-    )"
-
-    if [[ -z "${value}" ]]; then
-        value="NA"
-    fi
-
-    printf '%s\n' "${value}"
-}
-
-clock_at_least()
-{
-    local value="$1"
-    local minimum="$2"
-
-    [[ "${value}" =~ ^[0-9]+([.][0-9]+)?$ ]] || return 1
-    awk -v value="${value}" -v minimum="${minimum}" \
-        'BEGIN { exit !(value >= minimum) }'
-}
-
-if (( $# == 0 )); then
-    usage
-    exit 1
+    sweep_ecp5_parse_seeds usage "$@"
+    results_file="$(sweep_ecp5_results_filename "${SWEEP_DIR}")"
 fi
 
-if [[ ! "${SWEEP_JOBS}" =~ ^[1-9][0-9]*$ ]]; then
-    echo "Invalid SWEEP_JOBS: ${SWEEP_JOBS}; expected a positive integer." >&2
-    usage
-    exit 1
+sweep_ecp5_require_tool sha256sum
+sweep_ecp5_require_tool awk
+sweep_ecp5_require_tool grep
+sweep_ecp5_require_tool sed
+sweep_ecp5_require_file "${LPF}"
+mkdir -p "${BUILD_DIR}"
+
+synthesis_seconds="NA"
+if [[ -f "${SYNTH_DURATION_STAMP}" ]]; then
+    read -r synthesis_seconds < "${SYNTH_DURATION_STAMP}" || true
+fi
+if [[ ! "${synthesis_seconds}" =~ ^[0-9]+$ ]]; then
+    synthesis_seconds="NA"
 fi
 
-case "${HAZARD3_MEMORY_PROFILE}" in
-32m|64m)
-    ;;
-*)
-    echo "HAZARD3_MEMORY_PROFILE must be 32m or 64m." >&2
-    exit 1
-    ;;
-esac
-
-seeds=()
-declare -A seen_seeds=()
-
-if (( $# == 1 )) && [[ "$1" == "--all" ]]; then
-    mapfile -t seeds < <(seq 1 260)
-    results_file="${SWEEP_DIR}/results.csv"
+if [[ "${SWEEP_SKIP_SYNTH}" == "1" ]]; then
+    recorded_profile=""
+    if [[ -f "${SYNTH_PROFILE_STAMP}" ]]; then
+        read -r recorded_profile < "${SYNTH_PROFILE_STAMP}" || true
+    fi
+    if [[ "${recorded_profile}" != "${HAZARD3_MEMORY_PROFILE}" ]]; then
+        echo "Frozen ULX3S 12F netlist memory profile does not match requested ${HAZARD3_MEMORY_PROFILE}." >&2
+        exit 1
+    fi
+    printf 'Using existing synthesized ULX3S 12F netlist; synthesis skipped.\n'
 else
-    for arg in "$@"; do
-        if [[ "${arg}" == "--all" ]]; then
-            echo "--all cannot be combined with explicit seeds." >&2
-            usage
-            exit 1
-        fi
+    sweep_ecp5_require_tool make
+    sweep_ecp5_require_tool yosys
+    sweep_ecp5_require_file "${MAKEFILE}"
+    sweep_ecp5_require_file "${HAZARD3_ROOT}/example_soc/soc/cache_tags_zero_12f.hex"
+    sweep_ecp5_require_file "${HAZARD3_ROOT}/example_soc/soc/hazard3-12f-bootstrap.hex"
 
-        IFS=',' read -r -a arg_seeds <<< "${arg}"
-        for seed_arg in "${arg_seeds[@]}"; do
-            if [[ "${seed_arg}" =~ ^([0-9]+)-([0-9]+)$ ]]; then
-                seed_first=$((10#${BASH_REMATCH[1]}))
-                seed_last=$((10#${BASH_REMATCH[2]}))
-
-                if (( seed_first < 1 || seed_first > 260 ||
-                      seed_last < 1 || seed_last > 260 ||
-                      seed_first > seed_last )); then
-                    echo "Invalid seed range: ${seed_arg}; expected start-end within 1-260." >&2
-                    usage
-                    exit 1
-                fi
-
-                while (( seed_first <= seed_last )); do
-                    append_seed "${seed_first}"
-                    seed_first=$((seed_first + 1))
-                done
-            elif [[ "${seed_arg}" =~ ^[0-9]+$ ]]; then
-                append_seed "$((10#${seed_arg}))"
-            else
-                echo "Invalid seed: ${seed_arg}; expected 1-260 or a range such as 1-32." >&2
-                usage
-                exit 1
-            fi
-        done
-    done
-
-    if (( ${#seeds[@]} == 1 )); then
-        results_file="${SWEEP_DIR}/results-seed-${seeds[0]}.csv"
-    else
-        results_file="${SWEEP_DIR}/results-selected.csv"
+    current_profile=""
+    if [[ -f "${SYNTH_PROFILE_STAMP}" ]]; then
+        read -r current_profile < "${SYNTH_PROFILE_STAMP}" || true
     fi
-fi
-
-require_tool make
-require_tool yosys
-require_tool nextpnr-ecp5
-require_tool ecppack
-require_tool sha256sum
-require_tool awk
-require_tool grep
-require_tool sed
-require_file "${MAKEFILE}"
-require_file "${LPF}"
-require_file "${HAZARD3_ROOT}/example_soc/soc/cache_tags_zero_12f.hex"
-require_file "${HAZARD3_ROOT}/example_soc/soc/hazard3-12f-bootstrap.hex"
-
-mkdir -p "${SWEEP_DIR}"
-
-current_profile=""
-if [[ -f "${SYNTH_PROFILE_STAMP}" ]]; then
-    read -r current_profile < "${SYNTH_PROFILE_STAMP}" || true
-fi
-
-if [[ "${current_profile}" != "${HAZARD3_MEMORY_PROFILE}" ]]; then
-    if [[ -n "${current_profile}" ]]; then
-        printf 'ULX3S 12F SDRAM profile changed: %s -> %s\n' \
-            "${current_profile}" "${HAZARD3_MEMORY_PROFILE}"
-    else
-        printf 'ULX3S 12F SDRAM profile is not recorded; rebuilding for %s.\n' \
-            "${HAZARD3_MEMORY_PROFILE}"
+    if [[ "${current_profile}" != "${HAZARD3_MEMORY_PROFILE}" ]]; then
+        rm -f \
+            "${NETLIST}" \
+            "${SYNTH_LOG}" \
+            "${SYNTH_DURATION_STAMP}"
     fi
 
-    rm -f \
-        "${NETLIST}" \
-        "${SYNTH_DIR}/fpga_ulx3s_12f.config" \
-        "${SYNTH_DIR}/fpga_ulx3s_12f.bit" \
-        "${SYNTH_DIR}/fpga_ulx3s_12f.svf"
+    printf 'ULX3S 12F profile: compact 320x200, %s SDRAM\n' \
+        "${HAZARD3_MEMORY_PROFILE}"
+
+    synth_start_seconds="$(date +%s)"
+    sweep_ecp5_run_synthesis "${SYNTH_DIR}" "${SYNTH_LOG}" \
+        -f ULX3S_12F.mk \
+        CHIPNAME="${BUILD_DIR}/fpga_ulx3s_12f" \
+        HAZARD3_MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE}" \
+        HAZARD3_HDMI_EXTENDED_MODES=0 synth
+    if [[ "${SWEEP_SYNTHESIS_RAN}" == 1 ]]; then
+        synthesis_seconds="$(( $(date +%s) - synth_start_seconds ))"
+        printf '%s\n' "${synthesis_seconds}" > "${SYNTH_DURATION_STAMP}"
+    else
+        printf 'Synthesis reused the existing netlist; recorded duration remains %s.\n' \
+            "${synthesis_seconds}"
+    fi
+    printf '%s\n' "${HAZARD3_MEMORY_PROFILE}" > "${SYNTH_PROFILE_STAMP}"
 fi
-
-netlist_sha256_before=""
-if [[ -s "${NETLIST}" ]]; then
-    netlist_sha256_before="$(sha256sum "${NETLIST}" | awk '{print $1}')"
-fi
-
-printf 'ULX3S 12F profile: compact 320x200, %s SDRAM\n' \
-    "${HAZARD3_MEMORY_PROFILE}"
-
-# Synthesize once before starting concurrent routes. make tracks the Verilog,
-# compact cache-tag preload, bootstrap preload, and memory-profile inputs. This
-# is a no-op when the existing synthesized netlist is already current.
-make -C "${SYNTH_DIR}" -f ULX3S_12F.mk \
-    HAZARD3_MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE}" \
-    HAZARD3_HDMI_EXTENDED_MODES=0 synth
 
 [[ -s "${NETLIST}" ]] || {
-    echo "Synthesis completed without creating ${NETLIST}" >&2
+    echo "Missing synthesized ULX3S 12F netlist: ${NETLIST}" >&2
     exit 1
 }
-
 [[ -s "${SYNTH_LOG}" ]] || {
-    echo "Synthesis completed without creating ${SYNTH_LOG}" >&2
+    echo "Missing ULX3S 12F synthesis log: ${SYNTH_LOG}" >&2
     exit 1
 }
 
-printf '%s\n' "${HAZARD3_MEMORY_PROFILE}" > "${SYNTH_PROFILE_STAMP}"
-
-ebr_used="$(
-    awk '$2 == "DP16KD" {used=$1} END {print used}' "${SYNTH_LOG}"
-)"
+ebr_used="$(awk '$2 == "DP16KD" {used=$1} END {print used}' "${SYNTH_LOG}")"
 if [[ -z "${ebr_used}" ]]; then
     echo "ERROR: Could not determine ULX3S 12F DP16KD usage from synth.log." >&2
     exit 1
 fi
 if (( ebr_used > 32 )); then
     echo "ERROR: ULX3S 12F synthesis uses ${ebr_used} DP16KD blocks; LFE5U-12F limit is 32." >&2
-    echo "The 12F build must use the compact SDRAM scanout/cache profile before nextpnr." >&2
     exit 1
 fi
 if grep -Fq "ulx3s_frame_ram\\BANK_COUNT=" "${SYNTH_LOG}"; then
     echo "ERROR: ULX3S 12F synthesized the full EBR framebuffer hierarchy." >&2
-    echo "Expected ulx3s_hdmi_sdram_scanout selected by HAZARD3_ULX3S_12F." >&2
     exit 1
 fi
 
-printf 'ULX3S 12F synthesis check: compact profile, %s/32 DP16KD.\n' \
-    "${ebr_used}"
-
 netlist_sha256="$(sha256sum "${NETLIST}" | awk '{print $1}')"
-if [[ -n "${netlist_sha256_before}" &&
-      "${netlist_sha256_before}" != "${netlist_sha256}" ]]; then
-    printf 'Synthesized ULX3S 12F netlist changed; sweep will use the new netlist.\n'
-fi
+mkdir -p "${SWEEP_DIR}"
 
 {
     printf 'target=ulx3s-12f\n'
     printf 'device=12k\n'
+    printf 'speed=6\n'
     printf 'package=CABGA381\n'
-    printf 'placer=heap\n'
     printf 'full_route=1\n'
+    printf 'result_columns=seed,clk_sys_mhz,clk_video_mhz,clk_tmds_mhz,route_seconds,timing_status\n'
     printf 'hazard3_memory_profile=%s\n' "${HAZARD3_MEMORY_PROFILE}"
+    printf 'dp16kd_used=%s\n' "${ebr_used}"
+    sweep_ecp5_write_tuning_metadata
     printf 'clk_sys_required_mhz=40.00\n'
     printf 'clk_video_required_mhz=50.00\n'
     printf 'clk_tmds_required_mhz=250.00\n'
-    printf 'dp16kd_used=%s\n' "${ebr_used}"
+    printf 'synthesis_seconds=%s\n' "${synthesis_seconds}"
     printf 'netlist_sha256=%s\n' "${netlist_sha256}"
     printf 'netlist=fpga_ulx3s_12f.json\n'
     printf 'generated_utc=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 } > "${SWEEP_DIR}/metadata.txt"
 
+printf 'ULX3S 12F synthesis check: compact profile, %s/32 DP16KD.\n' "${ebr_used}"
+printf 'ULX3S 12F synthesis duration: %s seconds\n' "${synthesis_seconds}"
 printf 'ULX3S 12F routed sweep netlist SHA256: %s\n' "${netlist_sha256}"
 printf 'ULX3S 12F routed sweep directory: %s\n' "${SWEEP_DIR}"
-printf 'Routing %d seed(s):' "${#seeds[@]}"
-printf ' %s' "${seeds[@]}"
-printf '\n'
-printf 'Concurrent route jobs: %s\n' "${SWEEP_JOBS}"
+
+if [[ "${SWEEP_PREPARE_ONLY}" == "1" ]]; then
+    printf 'ULX3S 12F frozen sweep netlist prepared; routing skipped.\n'
+    exit 0
+fi
+
+sweep_ecp5_require_tool nextpnr-ecp5
+sweep_ecp5_require_tool timeout
+sweep_ecp5_require_tool ecppack
 
 run_seed()
 {
@@ -320,23 +241,22 @@ run_seed()
     local svf="${SWEEP_DIR}/fpga_ulx3s_12f-${seed}.svf"
     local bit="${SWEEP_DIR}/fpga_ulx3s_12f-${seed}.bit"
     local result="${SWEEP_DIR}/result-seed-${seed}.csv"
-    local clk_sys clk_video clk_tmds timing_status
+    local clk_sys clk_video clk_tmds
+    local route_start_seconds route_start_time
+    local route_end_seconds route_end_time
+    local route_seconds route_status
+    local clk_sys_status clk_video_status clk_tmds_status timing_status
 
-    printf '\nTrying nextpnr seed %s\n' "${seed}"
+    printf '\nTrying ULX3S 12F nextpnr seed %s\n' "${seed}"
+    rm -f "${pnr_log}" "${failed_log}" "${config}" "${svf}" "${bit}" "${result}"
 
-    # Prevent an unsuccessful rerun from being mistaken for artifacts from an
-    # earlier run of the same seed.
-    rm -f \
-        "${pnr_log}" \
-        "${failed_log}" \
-        "${config}" \
-        "${svf}" \
-        "${bit}" \
-        "${result}"
+    route_start_seconds="$(date +%s)"
+    route_start_time="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+    printf 'Seed %s route start: %s\n' "${seed}" "${route_start_time}"
 
-    if ! nextpnr-ecp5 \
+    if sweep_ecp5_run_nextpnr \
         --seed "${seed}" \
-        --placer heap \
+        "${SWEEP_NEXTPNR_ARGS[@]}" \
         --12k \
         --speed 6 \
         --package CABGA381 \
@@ -346,23 +266,51 @@ run_seed()
         --timing-allow-fail \
         --quiet \
         --log "${pnr_log}"; then
-        printf '%d,ERROR,ERROR,ERROR,ERROR\n' "${seed}" > "${result}"
-        printf 'Seed %s nextpnr failed; see %s\n' "${seed}" "${pnr_log}" >&2
-        if [[ -f "${pnr_log}" ]]; then
-            mv "${pnr_log}" "${failed_log}"
-        fi
-        rm -f "${config}" "${svf}" "${bit}"
-        return 1
+        route_status=0
+    else
+        route_status=$?
     fi
 
-    clk_sys="$(extract_clock "${pnr_log}" "clk_sys")"
-    clk_video="$(extract_clock "${pnr_log}" "clk_video_pix")"
-    clk_tmds="$(extract_clock "${pnr_log}" "clk_tmds_x5")"
+    route_end_seconds="$(date +%s)"
+    route_end_time="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+    route_seconds="$((route_end_seconds - route_start_seconds))"
+
+    printf 'Seed %s route end:   %s\n' "${seed}" "${route_end_time}"
+    printf 'Seed %s route elapsed: %ss\n' "${seed}" "${route_seconds}"
+
+    case "${route_status}" in
+    0)
+        ;;
+    124|137)
+        printf '%d,TIMEOUT,TIMEOUT,TIMEOUT,%s,TIMEOUT\n' \
+            "${seed}" "${route_seconds}" > "${result}"
+        rm -f "${config}" "${svf}" "${bit}"
+        printf 'Seed %s: routing timed out after %ss (kill grace %ss, status %s).\n' \
+            "${seed}" "${SWEEP_ROUTE_TIMEOUT_SECONDS}" \
+            "${SWEEP_ROUTE_KILL_AFTER_SECONDS}" "${route_status}" >&2
+        return 0
+        ;;
+    *)
+        printf '%d,ERROR,ERROR,ERROR,%s,ERROR\n' "${seed}" "${route_seconds}" > "${result}"
+        [[ -f "${pnr_log}" ]] && mv "${pnr_log}" "${failed_log}"
+        rm -f "${config}" "${svf}" "${bit}"
+        printf 'Seed %s: nextpnr route failed with status %s.\n' \
+            "${seed}" "${route_status}" >&2
+        return 1
+        ;;
+    esac
+
+    clk_sys="$(sweep_ecp5_extract_clock "${pnr_log}" "clk_sys")"
+    clk_video="$(sweep_ecp5_extract_clock "${pnr_log}" "clk_video_pix")"
+    clk_tmds="$(sweep_ecp5_extract_clock "${pnr_log}" "clk_tmds_x5")"
+    clk_sys_status="$(sweep_ecp5_extract_clock_status "${pnr_log}" "clk_sys")"
+    clk_video_status="$(sweep_ecp5_extract_clock_status "${pnr_log}" "clk_video_pix")"
+    clk_tmds_status="$(sweep_ecp5_extract_clock_status "${pnr_log}" "clk_tmds_x5")"
 
     timing_status="FAIL"
-    if clock_at_least "${clk_sys}" 40.00 &&
-       clock_at_least "${clk_video}" 50.00 &&
-       clock_at_least "${clk_tmds}" 250.00; then
+    if [[ "${clk_sys_status}" == "PASS" &&
+          "${clk_video_status}" == "PASS" &&
+          "${clk_tmds_status}" == "PASS" ]]; then
         timing_status="PASS"
     fi
 
@@ -372,82 +320,80 @@ run_seed()
         --idcode 0x21111043 \
         "${config}" \
         "${bit}"; then
-        printf '%d,%s,%s,%s,PACK_ERROR\n' \
-            "${seed}" "${clk_sys}" "${clk_video}" "${clk_tmds}" > "${result}"
-        printf 'Seed %s ecppack failed.\n' "${seed}" >&2
-        if [[ -f "${pnr_log}" ]]; then
-            mv "${pnr_log}" "${failed_log}"
-        fi
+        printf '%d,%s,%s,%s,%s,PACK_ERROR\n' \
+            "${seed}" "${clk_sys}" "${clk_video}" "${clk_tmds}" \
+            "${route_seconds}" > "${result}"
+        [[ -f "${pnr_log}" ]] && mv "${pnr_log}" "${failed_log}"
         rm -f "${config}" "${svf}" "${bit}"
         return 1
     fi
 
-    if [[ ! -s "${pnr_log}" || ! -s "${bit}" ]]; then
-        printf '%d,%s,%s,%s,ARTIFACT_ERROR\n' \
-            "${seed}" "${clk_sys}" "${clk_video}" "${clk_tmds}" > "${result}"
-        printf 'Seed %s completed but expected artifacts are missing or empty.\n' \
-            "${seed}" >&2
-        if [[ -f "${pnr_log}" ]]; then
-            mv "${pnr_log}" "${failed_log}"
-        fi
-        rm -f "${config}" "${svf}" "${bit}"
-        return 1
-    fi
+    printf '%d,%s,%s,%s,%s,%s\n' \
+        "${seed}" "${clk_sys}" "${clk_video}" "${clk_tmds}" \
+        "${route_seconds}" "${timing_status}" > "${result}"
 
-    printf '%d,%s,%s,%s,%s\n' \
-        "${seed}" "${clk_sys}" "${clk_video}" "${clk_tmds}" "${timing_status}" \
-        > "${result}"
-
-    # Match scripts/sweep.sh: retain the useful routed log and testable bitstream,
-    # but remove intermediate config/SVF files.
     rm -f "${failed_log}" "${config}" "${svf}"
-
-    printf 'Seed %s: clk_sys=%s MHz, clk_video=%s MHz, clk_tmds=%s MHz, %s\n' \
-        "${seed}" "${clk_sys}" "${clk_video}" "${clk_tmds}" "${timing_status}"
+    printf 'Seed %s: clk_sys=%s MHz, clk_video=%s MHz, clk_tmds=%s MHz, route=%ss, %s\n' \
+        "${seed}" "${clk_sys}" "${clk_video}" "${clk_tmds}" \
+        "${route_seconds}" "${timing_status}"
 }
 
-for seed in "${seeds[@]}"; do
+for seed in "${SWEEP_SEEDS[@]}"; do
     rm -f "${SWEEP_DIR}/result-seed-${seed}.csv"
 done
 
-run_status=0
-running=0
+printf 'Routing %d seed(s):' "${#SWEEP_SEEDS[@]}"
+printf ' %s' "${SWEEP_SEEDS[@]}"
+printf '\nConcurrent route jobs: %s\n' "${SWEEP_JOBS}"
+printf 'Per-seed nextpnr timeout: %ss (+%ss kill grace)\n' \
+    "${SWEEP_ROUTE_TIMEOUT_SECONDS}" "${SWEEP_ROUTE_KILL_AFTER_SECONDS}"
 
-for seed in "${seeds[@]}"; do
+status=0
+running=0
+for seed in "${SWEEP_SEEDS[@]}"; do
     run_seed "${seed}" &
     running=$((running + 1))
-
     if (( running >= SWEEP_JOBS )); then
-        if ! wait -n; then
-            run_status=1
-        fi
+        wait -n || status=1
         running=$((running - 1))
     fi
 done
-
 while (( running > 0 )); do
-    if ! wait -n; then
-        run_status=1
-    fi
+    wait -n || status=1
     running=$((running - 1))
 done
 
 {
-    printf 'seed,clk_sys_mhz,clk_video_mhz,clk_tmds_mhz,timing_status\n'
-    for seed in "${seeds[@]}"; do
+    printf 'seed,clk_sys_mhz,clk_video_mhz,clk_tmds_mhz,route_seconds,timing_status\n'
+    for seed in "${SWEEP_SEEDS[@]}"; do
         result="${SWEEP_DIR}/result-seed-${seed}.csv"
         if [[ -f "${result}" ]]; then
             cat "${result}"
         else
-            printf '%d,MISSING,MISSING,MISSING,MISSING\n' "${seed}"
-            run_status=1
+            printf '%d,MISSING,MISSING,MISSING,MISSING,MISSING\n' "${seed}"
+            status=1
         fi
     done
 } > "${results_file}"
 
-echo
-echo "Results: ${results_file}"
+pass_count="$(awk -F, 'NR > 1 && $6 == "PASS" {count++} END {print count + 0}' "${results_file}")"
+pass_seeds="$(awk -F, 'NR > 1 && $6 == "PASS" {if (s != "") s=s ", "; s=s $1} END {print s}' "${results_file}")"
+timeout_count="$(awk -F, 'NR > 1 && $6 == "TIMEOUT" {count++} END {print count + 0}' "${results_file}")"
+timeout_seeds="$(awk -F, 'NR > 1 && $6 == "TIMEOUT" {if (s != "") s=s ", "; s=s $1} END {print s}' "${results_file}")"
+printf 'Timing-passing seeds: %s\n' "${pass_count}"
 
-# Timing FAIL is a valid sweep result and does not make the script fail.
-# Return nonzero only for real synthesis, nextpnr, packaging, or artifact errors.
-exit "${run_status}"
+if [[ "${pass_seeds:-none}" != "none" ]]; then
+    printf '\n------------- PASS -------------\n'
+fi
+
+printf 'Timing-passing seeds: %s\n' "${pass_seeds:-none}"
+
+if [[ "${pass_seeds:-none}" != "none" ]]; then
+    printf '\n--------------------------------\n'
+fi
+
+printf 'Timed-out seeds: %s\n' "${timeout_count}"
+printf 'TIMEOUT seed values: %s\n' "${timeout_seeds:-none}"
+printf 'Results: %s\n' "${results_file}"
+
+exit "${status}"

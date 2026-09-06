@@ -37,12 +37,13 @@ l'image Doom et la cartographie mémoire SDRAM cohérents.
    un moniteur résident en SDRAM.
 
 ``scripts/build-ulx4m-ld-doom.sh``
-   Build complet ULX4M-LD 85F. Il utilise la cartographie 64 Mio à 50 MHz et
+   Build complet ULX4M-LD 85F. Il utilise la cartographie logicielle 64 Mio à 40 MHz et
    vérifie les sources LiteDRAM générées requises avant de construire le
    moniteur, l'image de boot embarquée, le bitstream FPGA et l'image Doom. Le
-   routage actuel présente des échecs de timing connus pour ``clk_sys`` et
-   LiteDRAM ; utilisez ``ALLOW_TIMING_FAILURE=1`` lorsque vous générez
-   intentionnellement le bitstream de développement actuel.
+   build de release utilise par défaut le seed 83 avec HeAP timingweight 30 et
+   doit respecter toutes les contraintes d'horloge. Un nouveau netlist doit être
+   routé et qualifié sur le matériel. Réservez ``ALLOW_TIMING_FAILURE=1`` aux
+   expériences explicites de sweep ULX4M-LD.
 
 Exemples :
 
@@ -50,7 +51,7 @@ Exemples :
 
    ./scripts/build-ulx3s-doom.sh
    ./scripts/build-ulx3s-12f-doom.sh
-   ALLOW_TIMING_FAILURE=1 ./scripts/build-ulx4m-ld-doom.sh
+   ./scripts/build-ulx4m-ld-doom.sh
 
 Pour tester un autre checkout Hazard3 sans modifier le gitlink Hazard3-Doom :
 
@@ -83,10 +84,13 @@ Outils de build du moniteur et du bitstream
 ``scripts/build-ecp5-bitstream-common.sh``
    Implémentation interne partagée de synthèse/place-and-route utilisée par les
    trois wrappers de bitstream spécifiques aux cartes. Elle n'est normalement
-   pas appelée directement. ``ALLOW_TIMING_FAILURE=1`` permet de générer un
-   bitstream tout en conservant les échecs de timing visibles comme
-   avertissements ; réservez-le à une exception de timing de développement
-   explicitement acceptée, comme la cible ULX4M-LD actuelle.
+   pas appelée directement. ``ALLOW_TIMING_FAILURE=1`` permet de conserver les
+   échecs de timing visibles lors d'un sweep exploratoire ULX4M-LD ; ne
+   l'utilisez pas pour un build de release.
+
+   Les JSON synthétisés, logs de synthèse, marqueurs de profil, sorties routées
+   et résultats de sweep restent sous ``build/`` dans le dépôt principal. Le
+   sous-module Hazard3 fournit uniquement les sources et les contraintes.
 
 ``scripts/make-boot-hex.py``
    Convertit un binaire du moniteur en fichier d'initialisation hexadécimal
@@ -94,8 +98,8 @@ Outils de build du moniteur et du bitstream
 
 ``scripts/build-xpack.cmd``
    Build natif Windows du moniteur avec ``bin/riscv-gcc``. Ses arguments sont
-   ``[build|clean|rebuild] [64m|32m] [50000000|25000000]``. Sans argument, il
-   construit le moniteur 64 Mio/50 MHz.
+   ``[build|clean|rebuild] [64m|32m] [50000000|40000000|25000000]``. Sans
+   argument, il construit le moniteur 64 Mio/50 MHz.
 
 Outils de build Doom et Supercon
 --------------------------------
@@ -129,6 +133,10 @@ Les sweeps de placement seul classent rapidement les candidats. Ils ne
 constituent pas une preuve finale de timing. Utilisez le sweep routé avant de
 sélectionner un seed de production.
 
+Pour l'architecture détaillée du sweep, les paramètres GitHub Actions, le modèle
+de netlist figé, le moniteur de timing en direct, les watchdogs, les artifacts
+et la stratégie d'expériences A/B, voir :doc:`timing-sweeps`.
+
 ``scripts/sweep-peek.sh``
    Sweep nextpnr de placement seul pour ULX3S 85F. Il s'arrête avant le routage.
    Sans argument de seed, il analyse la plage configurée ; un seed explicite
@@ -159,7 +167,28 @@ sélectionner un seed de production.
 
 ``scripts/sweep-ulx4m-ld.sh``
    Sweep de seeds routés ULX4M-LD. Accepte un seed unique ou une plage de seeds
-   et utilise deux jobs concurrents par défaut.
+   et utilise deux jobs concurrents par défaut. Les résultats sont conservés
+   sous ``build/ulx4m-ld-seed-sweep/<clock>-<cpu><tuning>/``.
+
+``scripts/sweep-ecp5.sh``
+   Répartiteur partagé des cibles, utilisé en local et dans GitHub Actions. Il
+   énumère les cibles, prépare/résout les chemins et appelle le sweep routé
+   spécifique à la cible.
+
+``scripts/sweep-ecp5-common.sh``
+   Implémentation nextpnr partagée. Elle valide les paramètres du placer/router,
+   construit les arguments nextpnr, applique les watchdogs, analyse les
+   fréquences maximales et écrit les CSV/métadonnées par seed.
+
+``scripts/watch-ecp5-sweep-results.sh``
+   Collecteur GitHub en direct. Il observe les artifacts de groupes terminés et
+   affiche les métriques, les comptes PASS/FAIL/TIMEOUT/OTHER, les durées et les
+   meilleures fréquences maximales observées par domaine.
+
+``scripts/summarize-ecp5-sweep.py``
+   Agrégateur CI final. Il combine tous les groupes avec les métadonnées et la
+   configuration figées, génère les résumés CSV/Markdown et vérifie que le sweep
+   est complet.
 
 Exemples :
 
@@ -355,7 +384,9 @@ Hygiène du dépôt et inventaire généré
    d'index résultante.
 
 ``scripts/check-nettype.sh``
-   Valide la gestion Verilog de ``default_nettype``.
+   Valide ``default_nettype`` dans le RTL du projet suivi par Git sous ``src/``
+   et ``tests/``. Les sources du bootloader tiers et des sous-modules sont
+   exclues.
 
 ``scripts/inventory.sh``
    Inventorie les fichiers suivis par Git pour le chemin demandé et écrit des

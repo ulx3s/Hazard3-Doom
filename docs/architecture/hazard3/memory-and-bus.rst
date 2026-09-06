@@ -92,25 +92,181 @@ The relevant source locations are:
 
 See :doc:`../memory-map` for the Hazard3-Doom software-visible memory layout.
 
-External SDRAM is not a Hazard3 CPU feature
--------------------------------------------
+External DRAM is not a Hazard3 CPU feature
+------------------------------------------
 
 The large Doom image, heap, IWAD data, and video buffers live in external
 memory in the project design. Support for that memory lives in the fork's
-example-SoC integration, including modules such as ``ahb_sdram.v`` and the
-ULX3S SDRAM controller.
+example-SoC integration. The ULX3S and ULX4M-LS targets use the native SDR
+SDRAM path, while ULX4M-LD uses the LiteDRAM DDR3 path.
 
 This is a critical architectural boundary:
 
 * **Upstream CPU responsibility:** execute loads/stores and obey bus
   ready/error responses.
-* **Project SoC responsibility:** decode SDRAM address windows, implement
-  caching/aliases where configured, arbitrate SDRAM users, and drive board
-  memory pins.
+* **Project SoC responsibility:** decode external-memory address windows,
+  implement caching/aliases where configured, arbitrate memory users, and
+  drive the board memory interface.
 
 A CPU load from ``0x20xxxxxx`` is not a special "SDRAM instruction." It is a
 normal RISC-V load whose physical address happens to be routed to the external
 memory subsystem.
+
+Memory controller implementations
+---------------------------------
+
+Hazard3-Doom uses three distinct memory mechanisms. Internal ECP5 EBR is
+synchronous block SRAM inside the FPGA and does not need a DRAM controller.
+The board-level SDR SDRAM and DDR3 devices are separate external memories and
+require controllers with refresh and DRAM timing state.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 19 20 27 34
+
+   * - Target/memory
+     - Physical interface
+     - Controller path
+     - Important behavior
+   * - ECP5 internal EBR
+     - On-chip synchronous SRAM
+     - ``ahb_sync_sram`` / inferred EBR
+     - No activate/precharge, refresh, or DRAM training. This is the lowest
+       latency and most deterministic memory, but EBR capacity is limited.
+   * - ULX3S 12F/85F
+     - External 16-bit SDR SDRAM
+     - ``ahb_sdram.v`` -> ``ulx3s_sdram_controller.v``
+     - Native project SDR controller. It accepts one controller request at a
+       time, keeps rows open across accesses when possible, uses CAS latency 2,
+       and periodically precharges for refresh. CPU and video requests are
+       arbitrated at the AHB/SDRAM adapter.
+   * - ULX4M-LS 85F
+     - External 16-bit SDR SDRAM, 32 MiB board device
+     - ``ahb_sdram.v`` -> ``ulx3s_sdram_controller.v``
+     - Uses the same native SDR memory subsystem as the ULX3S path at a 50 MHz
+       system clock. The board wrapper forwards a half-cycle-shifted SDRAM
+       clock and keeps video on a separate PLL.
+   * - ULX4M-LD 85F
+     - External x16 DDR3/DDR3L
+     - ``ahb_litedram.v`` -> generated LiteDRAM -> ``ECP5DDRPHY``
+     - The qualified profile uses a 60 MHz LiteDRAM user clock with a 128-bit
+       Wishbone interface while Hazard3/AHB runs at 40 MHz. LiteDRAM uses the
+       25 MHz board reference/init clock. The adapter crosses the clock domains
+       one request at a time; the generated LiteDRAM core owns chip-specific
+       DDR geometry and initialization.
+
+The two external-memory paths therefore have different performance tradeoffs.
+The native SDR controller is simpler and has less interface machinery, but
+external SDR SDRAM still has activate/CAS/refresh latency. DDR3 offers much
+higher burst bandwidth, while the current ULX4M-LD adapter adds clock-domain
+crossing and request-conversion overhead. In particular, the current adapter
+maps each DDR3 BL8 transfer to one 128-bit Wishbone word; writes use an atomic
+128-bit read/modify/write path before the full burst is written. For the
+in-order Hazard3 core, first-access latency and cache behavior can matter more
+than peak DDR transfer rate.
+
+Do not confuse the ULX3S external SDRAM with ECP5 EBR. EBR is SRAM physically
+inside the FPGA; the SDR SDRAM chip is a separate device on the board. LiteDRAM
+is not used in the ULX3S native SDR path.
+
+ULX4M-LD DDR3 configuration and qualification
+----------------------------------------------
+
+ULX4M-LD production boards may not all contain the same DDR3 device. The
+project is intended to support at least these x16 parts through separate
+LiteDRAM generated profiles:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 22 20 30
+
+   * - Device
+     - Density
+     - Approximate capacity
+     - Project note
+   * - Micron ``MT41K512M16HA``
+     - 8 Gbit, x16
+     - 1 GiB
+     - The currently hardware-qualified board uses this family. Its LiteDRAM
+       geometry is 16 row bits, 10 column bits, and 3 bank bits.
+   * - Alliance ``AS4C256M16D3``
+     - 4 Gbit, x16
+     - 512 MiB
+     - Supported as a board-population alternative through a different
+       generated LiteDRAM module/profile.
+
+The physical chip capacity is larger than the current Hazard3-Doom software
+map. Hazard3-Doom intentionally exposes a 64 MiB external-memory profile at
+``0x20000000-0x23ffffff`` plus the diagnostic alias; unused physical capacity
+is not required by the current software.
+
+Chip selection belongs in the generated LiteDRAM configuration, not in
+``ahb_litedram.v``. The AHB-to-LiteDRAM bridge interface remains the same while
+the generated core changes for memory device, initialization CPU, frequency,
+and other build-profile settings. This keeps board-population differences out
+of the Hazard3 system bus interface.
+
+The current hardware-qualified LiteDRAM settings are:
+
+.. code-block:: text
+
+   memtype: DDR3
+   phy: ECP5DDRPHY
+   input/reference clock: 25 MHz
+   LiteDRAM user clock: 60 MHz
+   LiteDRAM init clock: 25 MHz
+   Hazard3/AHB system clock: 40 MHz
+   user port: 128-bit Wishbone
+   cmd_buffer_depth: 2
+   cmd_buffer_buffered: true
+   with_auto_precharge: true
+   initialization CPU: SERV for the qualified checkpoint
+
+``cmd_buffer_depth=0`` was rejected during timing experiments because it
+created combinational-loop/timing problems. The qualified profile retains a
+depth of 2. ``with_auto_precharge`` remains ``true`` in the qualified
+configuration.
+
+The initialization CPU (for example SERV or VexRiscv) is part of the generated
+LiteDRAM core and does not change the ``ahb_litedram.v`` bus interface. Keep
+separate generated profiles so CPU type, DDR device, and user-clock frequency
+can be swept programmatically without hand-editing generated Verilog.
+
+The checked-in YAML profiles are the editable source for these generated cores.
+Select the physical RAM part number; one command regenerates both CPU variants:
+
+.. code-block:: bash
+
+   cd third_party/Hazard3/example_soc/third_party/LiteDRAM
+   ./regenerate-ulx4m.sh MT41K512M16HA
+   ./regenerate-ulx4m.sh AS4C256M16D3
+
+Each invocation replaces ``generated-serv/`` and ``generated-vexrisc/`` with
+the selected RAM profile. Confirm the ``ram_part`` recorded in each generated
+directory's ``LITEDRAM_VERSIONS.txt`` before building for a board.
+
+Hardware qualification is more than a nextpnr timing PASS. On the qualified
+Micron board, the monitor has passed all of the following against the 60 MHz
+LiteDRAM route:
+
+* 1 MiB destructive sequential test with byte/halfword/word access and zero,
+  ones, address, and inverse-address patterns;
+* sparse alias/address testing across the complete 64 MiB software-visible
+  window;
+* pseudorandom 1 MiB tests at four separated 16 MiB regions;
+* the complete ``q`` qualification suite, repeatedly;
+* the 40 MiB heap allocation/stress test;
+* the Doom platform memory/timer smoke test; and
+* copied RV32 code execution from DDR, including normal-GP and foreign-GP
+  phases with timer interrupts and guard checking.
+
+The status command is authoritative after startup. During one bring-up, the
+resident monitor printed a 5-second external-memory ``TIMEOUT`` while LiteDRAM
+was still calibrating, but a later ``s`` showed ``external_memory_ready=YES``,
+``init_done=YES``, ``init_error=NO``, ``pll_locked=YES``,
+``user_clock_ready=YES``, and ``ready=YES``. The subsequent qualification tests
+all passed. Therefore a startup timeout message should not be treated as a
+final DDR failure without checking current status.
 
 Memory ordering and ``fence.i``
 -------------------------------

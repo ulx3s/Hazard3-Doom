@@ -11,6 +11,33 @@ Cette section explique le processeur d'un point de vue pédagogique et, tout
 aussi important, sépare le **design Hazard3 standard** de l'**intégration
 ULX3S/Hazard3-Doom** construite autour de lui.
 
+
+Le lien avec le Raspberry Pi RP2350
+-----------------------------------
+
+Hazard3 est également l'une des architectures de processeur intégrées au
+microcontrôleur RP2350 de Raspberry Pi. Le RP2350 contient deux cœurs RISC-V
+Hazard3 open hardware ainsi que deux cœurs Arm Cortex-M33 ; le logiciel ou la
+configuration OTP sélectionne la paire de processeurs utilisée. Le RP2350 est
+le microcontrôleur utilisé par les Raspberry Pi Pico 2 et Pico 2 W.
+
+Cela rend le processeur de Hazard3-Doom particulièrement intéressant pour
+l'apprentissage : le projet FPGA utilise le même design de processeur Hazard3
+open source qu'un microcontrôleur Raspberry Pi produit en série. Cela ne
+signifie cependant pas que les deux CPU synthétisés ont une configuration
+identique. Hazard3 est paramétrable, et le RP2350 active un ensemble différent
+d'extensions ISA, d'extensions personnalisées, de fonctions de débogage et
+d'intégration SoC par rapport à la configuration FPGA Hazard3-Doom décrite
+ci-dessous.
+
+Références primaires utiles :
+
+* `Page produit Raspberry Pi RP2350 <https://www.raspberrypi.com/products/rp2350/>`_
+* `Datasheet Raspberry Pi RP2350, section 3.8 processeur Hazard3 <https://datasheets.raspberrypi.com/rp2350/rp2350-datasheet.pdf>`_
+* `Page produit Raspberry Pi Pico 2 <https://www.raspberrypi.com/products/raspberry-pi-pico-2/>`_
+* `Documentation microcontrôleurs Raspberry Pi - changement d'architecture <https://www.raspberrypi.com/documentation/microcontrollers/microcontroller-chips.html#architecture-switching>`_
+* `Source Hazard3 amont et notes de configuration RP2350 <https://github.com/Wren6991/Hazard3>`_
+
 Instantané source utilisé par ce projet
 ---------------------------------------
 

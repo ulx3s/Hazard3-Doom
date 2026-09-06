@@ -3,6 +3,13 @@ Hladno pokretanje s micro-SD kartice
 
 Put pokretanja sa SD kartice omogućuje programiranom ULX3S-u da se oporavi nakon potpunog prekida napajanja i pokrene Doom bez povezanog razvojnog računala.
 
+.. important::
+
+   Pokretanje s micro-SD kartice trenutačno je podržano samo na ULX3S ciljevima.
+   Na ULX4M-LD inicijalizacija ne prolazi CMD0 i monitorova naredba za pokretanje
+   sa SD kartice je onemogućena; ULX4M također nema ESP32 koji postoji na
+   ULX3S-u.
+
 Sadržaj kartice
 ---------------
 

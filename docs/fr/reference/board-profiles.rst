@@ -3,28 +3,33 @@ Profils de cartes
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 25 20 25
+   :widths: 18 16 28 14 24
 
    * - Carte
      - Profil mémoire
+     - Mémoire externe/contrôleur
      - Horloge système
      - Note vidéo/build
    * - ULX3S 85F
      - ``64m``
+     - SDR SDRAM 16 bits ; chemin du contrôleur natif ``ahb_sdram``
      - 50 MHz
      - 320x200 par défaut ; modes étendus disponibles
    * - ULX3S 12F
      - ``32m`` par défaut ; ``64m`` en option
+     - SDR SDRAM 16 bits ; chemin du contrôleur natif ``ahb_sdram``
      - 40 MHz
      - Scanout SDRAM compact 320x200
    * - ULX4M-LD 85F
      - ``64m``
-     - 50 MHz
-     - Cible LiteDRAM ; dérogation de timing requise
+     - Profil DDR3/DDR3L Micron ``MT41K512M16HA`` ou Alliance ``AS4C256M16D3`` ; ``ahb_litedram`` + LiteDRAM généré/``ECP5DDRPHY``
+     - CPU/AHB 40 MHz ; port utilisateur LiteDRAM 60 MHz ; référence/init 25 MHz
+     - Micron qualifié sur le matériel ; profils générés propres au composant
    * - ULX4M-LS 85F
      - ``32m``
-     - Profil 50 MHz documenté
-     - Référence du profil mémoire
+     - SDR SDRAM 16 bits de 32 Mio ; chemin du contrôleur natif ``ahb_sdram``
+     - 50 MHz
+     - Chemin mémoire SDR natif
 
 Le moniteur, l'image Doom liée et la cartographie mémoire SDRAM doivent utiliser
 le même profil mémoire. Les wrappers de build complets pour chaque carte règlent
@@ -33,9 +38,10 @@ automatiquement le profil et l'horloge propres à leur cible.
 Validation FPGA actuelle
 ------------------------
 
-La version actuelle a été reconstruite localement depuis l'arbre Hazard3 épinglé
-avec Yosys 0.60+70 et les seeds par défaut des cartes. Ces résultats routés sont
-des points de contrôle de régression, pas des garanties de timing portables :
+Les valeurs routées ci-dessous sont des points de contrôle de régression issus
+des builds du projet. Les révisions exactes, le SHA256 du netlist, les versions
+des outils CAD et les paramètres du sweep doivent être lus dans l'artifact
+correspondant ; ces valeurs ne sont pas des garanties de timing portables :
 
 .. list-table::
    :header-rows: 1
@@ -54,17 +60,18 @@ des points de contrôle de régression, pas des garanties de timing portables :
      - ``clk_sys`` 42.11 MHz
      - PASS à 40 MHz
    * - ULX4M-LD 85F
-     - 232
-     - ``clk_sys`` 43.78 MHz ; LiteDRAM 64.65 MHz
-     - FAIL à 50 MHz / 75.01 MHz
+     - 2
+     - ``clk_sys`` 43.94 MHz ; port utilisateur LiteDRAM 67.81 MHz
+     - PASS à 40 MHz / 60 MHz et DDR qualifiée sur le matériel
 
-Le build ULX4M-LD utilise donc ``ALLOW_TIMING_FAILURE=1`` lorsqu'un bitstream
-de développement est nécessaire. Cette dérogation transforme les échecs de
-timing en avertissements signalés ; elle ne prétend pas que le timing est fermé.
-Relancez le timing routé après toute modification importante du RTL, du netlist,
-du seed ou de la chaîne d'outils. Le résultat ULX3S 85F est propre au modèle de
-timing sélectionné par le flux actuel du projet et ne doit pas être comparé
-directement à des exécutions utilisant un autre modèle de timing ECP5.
+Le point de contrôle ULX4M-LD qualifié utilise un netlist figé, le seed 2 et
+HeAP ``timingweight=30``. Le bitstream testé sur le matériel a pour SHA256
+``294602982dfc4a9906961f2e8b6f43de925d8c11a7e5e6bb0f5e392965a868de``.
+La carte équipée de mémoire Micron a réussi la suite complète de qualification
+DDR, le stress du heap, le test Doom et l'exécution RV32 depuis la DDR. Un
+nouveau netlist doit être routé puis qualifié à nouveau ; un PASS de timing seul
+ne suffit pas. Voir :doc:`timing-sweeps` pour la provenance et les règles de
+comparaison.
 
 Bases principales des périphériques ULX3S
 -----------------------------------------

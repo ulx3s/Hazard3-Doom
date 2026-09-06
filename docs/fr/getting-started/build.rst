@@ -19,17 +19,21 @@ Cible compacte ULX3S 12F, 32 Mio par défaut, 40 MHz :
 
    ./scripts/build-ulx3s-12f-doom.sh
 
-ULX4M-LD 85F, 64 Mio, 50 MHz :
+ULX4M-LD 85F, cartographie logicielle 64 Mio, Hazard3 à 40 MHz et LiteDRAM à
+60 MHz. Le build normal doit respecter toutes les contraintes d'horloge :
 
 .. code-block:: bash
 
-   ALLOW_TIMING_FAILURE=1 ./scripts/build-ulx4m-ld-doom.sh
+   ./scripts/build-ulx4m-ld-doom.sh
 
-Le routage ULX4M-LD actuel présente des échecs de timing connus pour
-``clk_sys`` et LiteDRAM. ``ALLOW_TIMING_FAILURE=1`` conserve ces échecs visibles
-tout en autorisant la génération d'un bitstream de développement ; il ne fait
-pas réussir les contraintes. Voir :doc:`../reference/board-profiles` pour les
-résultats de validation actuels.
+Le build utilise par défaut le seed 83 avec HeAP ``timingweight=30``. Le point
+de contrôle historique seed 2 figé et versionné a également réussi la qualification DDR
+complète sur une carte ULX4M-LD équipée de mémoire Micron. Un nouveau build
+complet crée toutefois un nouveau netlist : relancez le sweep de timing et les
+tests matériels pour tout artifact de release. ``ALLOW_TIMING_FAILURE=1`` est
+réservé aux expériences explicites de sweep ULX4M-LD, et non aux builds de
+release. Voir :doc:`../reference/board-profiles` et
+:doc:`../reference/timing-sweeps`.
 
 Le wrapper 12F prend en charge une cartographie SDRAM 32 Mio ou 64 Mio, mais
 utilise 32 Mio par défaut. Si la cartographie 64 Mio est sélectionnée, gardez le
@@ -144,8 +148,10 @@ Par exemple, le flux 12F peut utiliser :
    SWEEP_JOBS=30 ./scripts/sweep-peek-ulx3s-12f.sh --all
    SWEEP_JOBS=30 ./scripts/sweep-ulx3s-12f.sh --all
 
-Voir :doc:`../reference/scripts` pour les outils de sweep 85F, 12F et ULX4M-LD
-ainsi que les emplacements des résultats.
+Voir :doc:`../reference/scripts` pour le catalogue des outils de sweep et
+:doc:`../reference/timing-sweeps` pour la matrice GitHub Actions, le choix des
+paramètres, le moniteur de timing en direct, les timeouts, les artifacts et les
+règles de reproductibilité.
 
 Propriété du build
 ------------------

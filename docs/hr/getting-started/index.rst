@@ -9,4 +9,5 @@ Ovaj odjeljak opisuje najkraći put od svježe kopije repozitorija do pokrenutog
    quick-start
    prerequisites
    build
+   tiny-tapeout-ulx3s
    programming

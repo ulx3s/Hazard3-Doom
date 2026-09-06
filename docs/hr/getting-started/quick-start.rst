@@ -13,9 +13,8 @@ Upotrijebite rekurzivno kloniranje kako bi podmoduli Hazard3 i DoomGeneric bili 
 
 .. code-block:: bash
 
-   git clone --recursive https://github.com/gojimmypi/Hazard3-Doom.git
+   git clone --recursive https://github.com/ulx3s/Hazard3-Doom.git
    cd Hazard3-Doom
-   git switch develop
    git submodule sync --recursive
    git submodule update --init --recursive
 
@@ -37,8 +36,9 @@ Važni izlazni artefakti uključuju:
 .. code-block:: text
 
    build/fpga_ulx3s.bit
-   build/hazard3-boot-monitor.elf
-   build/doom-image/hazard3-doom.h3d
+   build/ulx3s/monitor/hazard3-boot-monitor.elf
+   build/ulx3s/doom-image/hazard3-doom.h3d
+   build/ulx3s/hazard3-boot-monitor.hex
 
 3. Programirajte FPGA za probno pokretanje
 ------------------------------------------

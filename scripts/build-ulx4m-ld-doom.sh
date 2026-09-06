@@ -26,14 +26,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 HAZARD3_ROOT="${HAZARD3_ROOT:-${ROOT_DIR}/third_party/Hazard3}"
 SYNTH_DIR="${HAZARD3_ROOT}/example_soc/synth"
-MONITOR_BUILD_DIR="${HAZARD3_BUILD_DIR:-${ROOT_DIR}/build}"
-DOOM_BUILD_DIR="${HAZARD3_DOOM_BUILD_DIR:-${ROOT_DIR}/build/doom-image}"
+BOARD_BUILD_DIR="${ROOT_DIR}/build/ulx4m-ld"
+MONITOR_BUILD_DIR="${HAZARD3_BUILD_DIR:-${BOARD_BUILD_DIR}/monitor}"
+DOOM_BUILD_DIR="${HAZARD3_DOOM_BUILD_DIR:-${BOARD_BUILD_DIR}/doom-image}"
 FPGA_OUTPUT="${ROOT_DIR}/build/fpga_ulx4m_ld.bit"
 MONITOR_OUTPUT="${MONITOR_BUILD_DIR}/hazard3-boot-monitor.elf"
 MONITOR_BIN="${MONITOR_BUILD_DIR}/hazard3-boot-monitor.bin"
-BOOT_HEX="${HAZARD3_ROOT}/example_soc/soc/hazard3-boot-monitor.hex"
+BOOT_HEX_WORK="${HAZARD3_ROOT}/example_soc/soc/hazard3-boot-monitor.hex"
+BOOT_HEX_OUTPUT="${BOARD_BUILD_DIR}/hazard3-boot-monitor.hex"
 DOOM_OUTPUT="${DOOM_BUILD_DIR}/hazard3-doom.h3d"
-LITEDRAM_DIR="${HAZARD3_ROOT}/example_soc/third_party/LiteDRAM/generated"
+LITEDRAM_DIR="${HAZARD3_ROOT}/example_soc/third_party/LiteDRAM"
+HAZARD3_ULX4M_SYS_CLK_MHZ="${HAZARD3_ULX4M_SYS_CLK_MHZ:-40}"
+ULX4M_LITEDRAM_CPU="${ULX4M_LITEDRAM_CPU:-serv}"
 
 # Run shellcheck to ensure this is a good script.
 # Specify the executable shell checker you want to use:
@@ -78,7 +82,34 @@ require_tool()
     }
 }
 
+case "${HAZARD3_ULX4M_SYS_CLK_MHZ}" in
+25|40|50)
+    ;;
+*)
+    echo "HAZARD3_ULX4M_SYS_CLK_MHZ must be 25, 40, or 50" >&2
+    exit 1
+    ;;
+esac
+HAZARD3_ULX4M_SYS_CLK_HZ=$((HAZARD3_ULX4M_SYS_CLK_MHZ * 1000000))
+
+case "${ULX4M_LITEDRAM_CPU}" in
+serv)
+    LITEDRAM_GENERATED_DIR="${LITEDRAM_DIR}/generated-serv"
+    ;;
+vexrisc)
+    LITEDRAM_GENERATED_DIR="${LITEDRAM_DIR}/generated-vexrisc"
+    ;;
+*)
+    echo "ULX4M_LITEDRAM_CPU must be serv or vexrisc" >&2
+    exit 1
+    ;;
+esac
+
+printf 'ULX4M-LD build configuration: system clock=%s MHz, LiteDRAM CPU=%s\n' \
+    "${HAZARD3_ULX4M_SYS_CLK_MHZ}" "${ULX4M_LITEDRAM_CPU}"
+
 require_tool make
+require_tool install
 require_tool python3
 require_file "${SYNTH_DIR}/ULX4M_LD_85F.mk"
 require_file "${HAZARD3_ROOT}/scripts/synth_ecp5.mk"
@@ -86,28 +117,34 @@ require_executable "${HAZARD3_ROOT}/scripts/listfiles"
 require_executable "${ROOT_DIR}/scripts/build-ulx4m-ld-bitstream.sh"
 require_file "${HAZARD3_ROOT}/example_soc/libfpga/common/reset_sync.v"
 require_file "${LITEDRAM_DIR}/litedram_ulx4m_cpu.v"
-require_file "${LITEDRAM_DIR}/litedram_ulx4m_cpu_rom.init"
-require_file "${LITEDRAM_DIR}/litedram_ulx4m_cpu_sram.init"
+require_file "${LITEDRAM_GENERATED_DIR}/litedram_ulx4m_cpu.v"
+require_file "${LITEDRAM_GENERATED_DIR}/litedram_ulx4m_cpu_rom.init"
+require_file "${LITEDRAM_GENERATED_DIR}/litedram_ulx4m_cpu_sram.init"
 require_executable "${ROOT_DIR}/scripts/build.sh"
 require_executable "${ROOT_DIR}/scripts/make-boot-hex.py"
 require_executable "${ROOT_DIR}/doom/build-doom-image.sh"
 
-printf 'Building the shared 50 MHz monitor with the 64 MiB map...\n'
+printf 'Building the shared %s MHz monitor with the 64 MiB map...\n' \
+    "${HAZARD3_ULX4M_SYS_CLK_MHZ}"
 HAZARD3_BUILD_DIR="${MONITOR_BUILD_DIR}" \
 HAZARD3_MEMORY_PROFILE=64m \
-HAZARD3_SYS_CLK_HZ=50000000 \
+HAZARD3_SYS_CLK_HZ="${HAZARD3_ULX4M_SYS_CLK_HZ}" \
     "${ROOT_DIR}/scripts/build.sh"
 
 require_file "${MONITOR_OUTPUT}"
 require_file "${MONITOR_BIN}"
 
 printf '\nEmbedding the resident monitor into ULX4M EBR initialization...\n'
+mkdir -p "${BOARD_BUILD_DIR}"
 "${ROOT_DIR}/scripts/make-boot-hex.py" \
-    "${MONITOR_BIN}" "${BOOT_HEX}" --bytes 0x10000 --load-address 0x40
-require_file "${BOOT_HEX}"
+    "${MONITOR_BIN}" "${BOOT_HEX_WORK}" --bytes 0x10000 --load-address 0x40
+require_file "${BOOT_HEX_WORK}"
+install -m 0644 "${BOOT_HEX_WORK}" "${BOOT_HEX_OUTPUT}"
 
 printf '\nBuilding the Hazard3 ULX4M-LD 85F FPGA target with cold-boot monitor...\n'
 HAZARD3_ROOT="${HAZARD3_ROOT}" \
+HAZARD3_ULX4M_SYS_CLK_MHZ="${HAZARD3_ULX4M_SYS_CLK_MHZ}" \
+ULX4M_LITEDRAM_CPU="${ULX4M_LITEDRAM_CPU}" \
     "${ROOT_DIR}/scripts/build-ulx4m-ld-bitstream.sh"
 
 require_file "${FPGA_OUTPUT}"
@@ -120,10 +157,10 @@ HAZARD3_MEMORY_PROFILE=64m \
 require_file "${FPGA_OUTPUT}"
 require_file "${MONITOR_OUTPUT}"
 require_file "${DOOM_OUTPUT}"
-require_file "${BOOT_HEX}"
+require_file "${BOOT_HEX_OUTPUT}"
 
 printf '\nULX4M-LD 85F Doom build complete.\n'
 printf '  FPGA:    %s\n' "${FPGA_OUTPUT}"
 printf '  Monitor: %s\n' "${MONITOR_OUTPUT}"
 printf '  Doom:    %s\n' "${DOOM_OUTPUT}"
-printf '  Boot HEX:%s\n' "${BOOT_HEX}"
+printf '  Boot HEX: %s\n' "${BOOT_HEX_OUTPUT}"

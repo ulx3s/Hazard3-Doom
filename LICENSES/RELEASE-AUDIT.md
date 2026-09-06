@@ -19,6 +19,11 @@ Before publishing a Hazard3-Doom release:
   Location requirements.
 - Preserve the James Bowman BSD 3-Clause notice if I2CDriver-derived code is
   redistributed; do not imply endorsement.
+- For HAD2019/ULX3S/ULX4M bootloader-derived material, preserve the exact
+  upstream per-file licenses and copyright headers. Do not treat the bootloader
+  as blanket dual-licensed LGPL/BSD material. Include
+  `HAD2019-Bootloader-NOTICE.md` and the applicable LGPL-3.0-or-later,
+  BSD-3-Clause, ISC/PicoRV32, and mini-printf notices for redistributed content.
 - Review `benchmarks/coremark` against EEMBC's current CoreMark source license,
   acceptable-use, result-reporting, and trademark rules before publication.
 - Do not package commercial DOOM IWAD/game-data files without an independent
@@ -31,6 +36,11 @@ Before publishing a Hazard3-Doom release:
   exceptions.
 - For an xPack OpenOCD binary, preserve the exact archive's
   `distro-info/licenses` content instead of reconstructing it from memory.
+- For bundled dfu-util executables, pin the exact release/source revision and
+  preserve the matching GPL materials and corresponding source. Audit the
+  dynamically linked and static Windows builds separately; do not assume the
+  dependency/source obligations for `dfu-util.exe` and `dfu-util-static.exe`
+  are identical.
 - Review the WebUSB flasher provenance described in
   `Web-Flasher-Provenance-NOTICE.md`; preserve exact upstream notices for any
   copied or closely translated implementation material.
