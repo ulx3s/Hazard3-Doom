@@ -55,6 +55,7 @@ Commencer ici
 * :doc:`about/index` - comprendre le projet, ses usages pédagogiques et l'intérêt de l'ULX4M pour le prototypage modulaire.
 * :doc:`getting-started/quick-start` - mettre une carte en fonctionnement avec un minimum d'étapes.
 * :doc:`getting-started/build` - construire le FPGA, le moniteur résident et l'image Doom.
+* :doc:`getting-started/tiny-tapeout-ulx3s` - construire des projets Tiny Tapeout pour le FPGA ECP5 ULX3S localement ou avec GitHub Actions.
 * :doc:`hardware/ulx4m/index` - explorer le matériel ULX4M : FPGA, horloges, SDR/DDR3, flash, vidéo, SD, SerDes, contraintes de broches et révisions.
 * :doc:`reference/timing-sweeps` - exécuter les sweeps ECP5 localement/GitHub et interpréter le timing en direct.
 * :doc:`user-guide/web-flasher` - programmer la SRAM du FPGA ULX3S directement depuis Chrome/Edge avec WebUSB.

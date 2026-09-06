@@ -54,6 +54,7 @@ Počnite ovdje
 * :doc:`about/index` - saznajte što je projekt, čemu služi u obrazovanju i zašto je ULX4M koristan za modularno prototipiranje.
 * :doc:`getting-started/quick-start` - pokrenite pločicu uz najmanji broj koraka.
 * :doc:`getting-started/build` - izgradite FPGA, rezidentni monitor i Doom sliku.
+* :doc:`getting-started/tiny-tapeout-ulx3s` - gradite Tiny Tapeout projekte za ULX3S ECP5 lokalno ili pomoću GitHub Actionsa.
 * :doc:`hardware/ulx4m/index` - istražite ULX4M hardver: FPGA, satove, SDR/DDR3, flash, video, SD, SerDes, pin ograničenja i revizije.
 * :doc:`reference/timing-sweeps` - pokrenite lokalne/GitHub ECP5 sweepove i tumačite live timing rezultate.
 * :doc:`user-guide/web-flasher` - programirajte FPGA SRAM na ULX3S izravno iz Chromea/Edgea putem WebUSB-a.

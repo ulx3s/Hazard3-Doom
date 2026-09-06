@@ -56,6 +56,7 @@ Start here
 * :doc:`about/index` - understand what the project is, what it teaches, and why ULX4M is useful for modular prototyping.
 * :doc:`getting-started/quick-start` - get a board running with the minimum number of steps.
 * :doc:`getting-started/build` - build the FPGA, resident monitor, and Doom image.
+* :doc:`getting-started/tiny-tapeout-ulx3s` - build Tiny Tapeout projects for ULX3S ECP5 locally or in GitHub Actions.
 * :doc:`hardware/ulx4m/index` - explore the ULX4M board itself: FPGA, clocks, SDR/DDR3, flash, video, SD, SerDes, pin constraints, and revisions.
 * :doc:`reference/timing-sweeps` - run local/GitHub ECP5 seed sweeps and interpret live timing results.
 * :doc:`user-guide/web-flasher` - program ULX3S FPGA SRAM directly from Chrome/Edge with WebUSB.
@@ -119,6 +120,6 @@ Project links
 * `ULX3S Pinout Tool <https://github.com/ulx3s/ulx3s-pinout>`_
 * `ULX3S ulx3s.github.io <https://github.com/ulx3s/ulx3s.github.io>`_
 * `Tiny Tapeout for the ULX3S <https://github.com/ulx3s/ttsky-verilog-template/tree/ulx3s>`_
-* `Tiny Tapeout for the ULX3S <https://github.com/ulx3s/tt-gds-action/tree/experimental>`_
-* `Tiny Tapeout for the ULX3S <https://github.com/ulx3s/tt-support-tools/tree/experimental>`_
+* `ULX3S Tiny Tapeout GitHub Action <https://github.com/ulx3s/tt-gds-action/tree/experimental>`_
+* `ULX3S Tiny Tapeout support tools <https://github.com/ulx3s/tt-support-tools/tree/experimental>`_
 * `Verilog Language Extension for Visual Studio <https://github.com/gojimmypi/VerilogLanguageExtension>`_
