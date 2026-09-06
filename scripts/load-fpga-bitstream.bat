@@ -1,4 +1,23 @@
 @echo off
+rem -----------------------------------------------------------------------------
+rem File:        load-fpga-bitstream.bat
+rem Path:        scripts/load-fpga-bitstream.bat
+rem
+rem Project:     Hazard3-Doom
+rem Purpose:     Program a Hazard3-Doom FPGA bitstream from Windows using the
+rem              configured loader.
+rem
+rem Copyright (c) 2026 gojimmypi
+rem
+rem Licensed under the Apache License, Version 2.0.
+rem
+rem SPDX-License-Identifier: Apache-2.0
+rem
+rem This software is provided under the terms of the applicable license.
+rem See LICENSES/Apache-2.0.txt for the complete license terms.
+rem See LICENSING.md for project licensing policy and scope.
+rem -----------------------------------------------------------------------------
+
 setlocal EnableExtensions EnableDelayedExpansion
 
 rem Resolve the repository root from this script's location.
@@ -7,8 +26,8 @@ for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
 
 echo Repository root: "%ROOT_DIR%"
 
-if exist "%ROOT_DIR%\build\hazard3-test.bit" (
-    set "SOURCE_BITSTREAM=%ROOT_DIR%\build\hazard3-test.bit"
+if exist "%ROOT_DIR%\build\hazard3-boot-monitor.bit" (
+    set "SOURCE_BITSTREAM=%ROOT_DIR%\build\hazard3-boot-monitor.bit"
 
     echo.
     echo Using locally built FPGA bitstream:
@@ -27,7 +46,7 @@ if exist "%ROOT_DIR%\build\hazard3-test.bit" (
         >&2 echo ERROR: No FPGA bitstream was found.
         >&2 echo.
         >&2 echo Checked:
-        >&2 echo   "%ROOT_DIR%\build\hazard3-test.bit"
+        >&2 echo   "%ROOT_DIR%\build\hazard3-boot-monitor.bit"
         >&2 echo   "%ROOT_DIR%\bin\fpga_ulx3s_hdmi_doom.bit"
         >&2 echo.
         goto ERROR_EXIT

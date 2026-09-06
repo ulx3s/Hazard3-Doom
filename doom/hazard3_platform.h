@@ -1,3 +1,22 @@
+/* -----------------------------------------------------------------------------
+ * File:        hazard3_platform.h
+ * Path:        doom/hazard3_platform.h
+ *
+ * Project:     Hazard3-Doom
+ * Purpose:     Declare the shared Hazard3 platform services used by monitor and
+ *              Doom-side code.
+ *
+ * Copyright (c) 2026 gojimmypi
+ *
+ * Licensed under the Apache License, Version 2.0.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * This software is provided under the terms of the applicable license.
+ * See LICENSES/Apache-2.0.txt for the complete license terms.
+ * See LICENSING.md for project licensing policy and scope.
+ * -------------------------------------------------------------------------- */
+
 #ifndef HAZARD3_PLATFORM_H
 #define HAZARD3_PLATFORM_H
 
@@ -7,6 +26,7 @@
 #include "hazard3_monitor_services.h"
 
 void hazard3_monitor_services_bind(const hazard3_monitor_services_t* services);
+void hazard3_image_exit(int status);
 void hazard3_console_putc(uint8_t value);
 void hazard3_console_puts(const char* text);
 void hazard3_console_put_hex32(uint32_t value);

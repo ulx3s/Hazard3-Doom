@@ -1,11 +1,72 @@
 [submodule "third_party/doomgeneric"]
-	path = third_party/doomgeneric
-	url = https://github.com/ulx3s/doomgeneric.git
-	update = checkout
-	branch = ulx-doom
+    path = third_party/doomgeneric
+    url = https://github.com/ulx3s/doomgeneric.git
+    update = checkout
+    branch = ulx-doom
 
+# When changing the Hazard3 submodule, refresh and confirm:
+#
+# Optional: inspect and preserve any tracked local changes that would
+# prevent checkout. Untracked WIP files normally do not need to be stashed.
+#
+# Fetch the intended Hazard3 integration branch:
+#
+# git -C third_party/Hazard3 fetch https://github.com/ulx3s/Hazard3.git ulx-doom
+#
+# Confirm the fetched revision before switching:
+#
+# git -C third_party/Hazard3 log -1 --oneline FETCH_HEAD
+#
+# Check out the exact fetched revision:
+#
+# git -C third_party/Hazard3 checkout --detach FETCH_HEAD
+#
+# Refresh submodule URLs and check out the exact nested revisions recorded
+# by that Hazard3 commit:
+#
+# git -C third_party/Hazard3 submodule sync --recursive
+# git -C third_party/Hazard3 submodule update --init --recursive
+#
+# Do not use --remote for the recursive update. --remote follows nested
+# submodule branches and can move them away from the commits recorded by
+# Hazard3, making the checkout non-reproducible.
+#
+# Confirm the Hazard3 and libfpga revisions:
+#
+# git -C third_party/Hazard3 log -1 --oneline
+#
+# Currently: 3c0aca0 (HEAD) Merge pull request #9 from gojimmypi/ulx-doom-dev
+#
+# git -C third_party/Hazard3 rev-parse HEAD:example_soc/libfpga
+# git -C third_party/Hazard3/example_soc/libfpga rev-parse HEAD
+#
+# Currently: 2c430246892d52c41c610bfdb2afc88992986e00
+#
+# Confirm all nested submodules match their recorded gitlinks:
+#
+# git -C third_party/Hazard3 submodule status --recursive
+#
+# A leading space means the nested checkout matches the recorded gitlink.
+# A leading '+' means it is checked out at a different revision.
+#
+# Finally inspect local status:
+#
+# git -C third_party/Hazard3 status --short
+# git -C third_party/Hazard3/example_soc/libfpga status --short
+
+
+# ulx3s release on ulx-doom branch
+# ------------------------------------------------------
 [submodule "third_party/Hazard3"]
-	path = third_party/Hazard3
-	url = https://github.com/ulx3s/Hazard3.git
-	branch = ulx-doom
-	update = checkout
+    path = third_party/Hazard3
+    url = https://github.com/ulx3s/Hazard3.git
+    branch = ulx-doom
+    update = checkout
+
+# dev:
+# ------------------------------------------------------
+# [submodule "third_party/Hazard3"]
+#     path = third_party/Hazard3
+#     url = https://github.com/gojimmypi/Hazard3.git
+#     branch = ulx-doom-dev
+#     update = checkout

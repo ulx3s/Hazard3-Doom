@@ -1,3 +1,22 @@
+/* -----------------------------------------------------------------------------
+ * File:        hazard3_memory_map.h
+ * Path:        doom/hazard3_memory_map.h
+ *
+ * Project:     Hazard3-Doom
+ * Purpose:     Define shared external-memory regions used by the monitor and
+ *              loaded Doom image.
+ *
+ * Copyright (c) 2026 gojimmypi
+ *
+ * Licensed under the Apache License, Version 2.0.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * This software is provided under the terms of the applicable license.
+ * See LICENSES/Apache-2.0.txt for the complete license terms.
+ * See LICENSING.md for project licensing policy and scope.
+ * -------------------------------------------------------------------------- */
+
 #ifndef HAZARD3_MEMORY_MAP_H
 #define HAZARD3_MEMORY_MAP_H
 
@@ -37,7 +56,27 @@
 #endif
 
 #define HAZARD3_SDRAM_BANK_COUNT              4u
+
+/*
+ * HDMI SDRAM staging layout.
+ *
+ * The legacy 320x200 path keeps its original 64 KiB bank spacing so existing
+ * software continues to work unchanged. The optional 400x240 test mode uses a
+ * 96 KiB-aligned second staging buffer. A separate uncached workbuffer follows
+ * both high-resolution staging buffers. The 512x300 GUI uses this workbuffer as
+ * a packed 4-bpp staging surface; presentation copies it into the existing EBR
+ * frame banks, so there is no continuous SDRAM video scanout.
+ */
 #define HAZARD3_VIDEO_FRAMEBUFFER0_BASE       HAZARD3_VIDEO_BASE
 #define HAZARD3_VIDEO_FRAMEBUFFER1_BASE       (HAZARD3_VIDEO_BASE + 0x00010000u)
+#define HAZARD3_VIDEO_FRAMEBUFFER1_HIGH_BASE  (HAZARD3_VIDEO_BASE + 0x00018000u)
+#define HAZARD3_VIDEO_GUI_FRAMEBUFFER_BASE    (HAZARD3_VIDEO_BASE + 0x00030000u)
+#define HAZARD3_VIDEO_WORKBUFFER_BASE         HAZARD3_VIDEO_GUI_FRAMEBUFFER_BASE
+
+/*
+ * Persistent Screen Snip cache. Keep it separate from all staging/workbuffer
+ * surfaces so monitor, Doom, and GUI presentation cannot overwrite it.
+ */
+#define HAZARD3_SCREEN_SNIP_CACHE_BASE        (HAZARD3_VIDEO_BASE + 0x00050000u)
 
 #endif

@@ -1,10 +1,29 @@
 @echo off
+rem -----------------------------------------------------------------------------
+rem File:        build-xpack.cmd
+rem Path:        scripts/build-xpack.cmd
+rem
+rem Project:     Hazard3-Doom
+rem Purpose:     Build the Hazard3 resident monitor on native Windows with
+rem              the repository xPack RISC-V toolchain.
+rem
+rem Copyright (c) 2026 gojimmypi
+rem
+rem Licensed under the Apache License, Version 2.0.
+rem
+rem SPDX-License-Identifier: Apache-2.0
+rem
+rem This software is provided under the terms of the applicable license.
+rem See LICENSES/Apache-2.0.txt for the complete license terms.
+rem See LICENSING.md for project licensing policy and scope.
+rem -----------------------------------------------------------------------------
+
 setlocal EnableExtensions
 
 rem Native Windows build for the Hazard3 resident monitor.
 rem
 rem Usage:
-rem   build-xpack.cmd [build^|clean^|rebuild] [64m^|32m] [50000000^|25000000]
+rem   build-xpack.cmd [build^|clean^|rebuild] [64m^|32m] [50000000^|40000000^|25000000]
 rem
 rem Defaults:
 rem   build 64m 50000000
@@ -32,16 +51,16 @@ set "TOOLCHAIN_BIN=%TOOLCHAIN_ROOT%\bin"
 set "CC=%TOOLCHAIN_BIN%\riscv-none-elf-gcc.exe"
 set "OBJCOPY=%TOOLCHAIN_BIN%\riscv-none-elf-objcopy.exe"
 set "SIZE=%TOOLCHAIN_BIN%\riscv-none-elf-size.exe"
-set "OUTPUT_ELF=%BUILD_DIR%\hazard3-test.elf"
-set "OUTPUT_MAP=%BUILD_DIR%\hazard3-test.map"
-set "OUTPUT_BIN=%BUILD_DIR%\hazard3-test.bin"
+set "OUTPUT_ELF=%BUILD_DIR%\hazard3-boot-monitor.elf"
+set "OUTPUT_MAP=%BUILD_DIR%\hazard3-boot-monitor.map"
+set "OUTPUT_BIN=%BUILD_DIR%\hazard3-boot-monitor.bin"
 
 if /i "%ACTION%"=="build" goto :validate
 if /i "%ACTION%"=="clean" goto :clean_only
 if /i "%ACTION%"=="rebuild" goto :rebuild
 
 echo ERROR: Unsupported action "%ACTION%".
-echo Usage: %~nx0 [build^|clean^|rebuild] [64m^|32m] [50000000^|25000000]
+echo Usage: %~nx0 [build^|clean^|rebuild] [64m^|32m] [50000000^|40000000^|25000000]
 exit /b 2
 
 :validate
@@ -58,16 +77,16 @@ exit /b 2
 
 :memory_ok
 if "%SYSTEM_CLOCK_HZ%"=="50000000" goto :clock_ok
+if "%SYSTEM_CLOCK_HZ%"=="40000000" goto :clock_ok
 if "%SYSTEM_CLOCK_HZ%"=="25000000" goto :clock_ok
 
 echo ERROR: Unsupported system clock "%SYSTEM_CLOCK_HZ%".
-echo Use 50000000 or 25000000.
+echo Use 50000000, 40000000 or 25000000.
 exit /b 2
 
 :clock_ok
 call :require_toolchain
 if errorlevel 1 exit /b 1
-
 call :require_file "%SRC_DIR%\start.S"
 if errorlevel 1 exit /b 1
 
@@ -78,6 +97,12 @@ call :require_file "%SRC_DIR%\sao_console.c"
 if errorlevel 1 exit /b 1
 
 call :require_file "%SRC_DIR%\sao_console.h"
+if errorlevel 1 exit /b 1
+
+call :require_file "%SRC_DIR%\i2cdriver_hdmi.c"
+if errorlevel 1 exit /b 1
+
+call :require_file "%SRC_DIR%\i2cdriver_hdmi.h"
 if errorlevel 1 exit /b 1
 
 call :require_file "%SRC_DIR%\sd_spi.c"
@@ -104,7 +129,6 @@ if errorlevel 1 exit /b 1
 
 call :require_file "%DOOM_DIR%\doom_image_loader.c"
 if errorlevel 1 exit /b 1
-
 call :require_file "%DOOM_DIR%\doom_wad_loader.c"
 if errorlevel 1 exit /b 1
 
@@ -165,6 +189,7 @@ if errorlevel 1 (
     "%SRC_DIR%\fat_ro.c" ^
     "%SRC_DIR%\sd_boot.c" ^
     "%SRC_DIR%\sao_console.c" ^
+    "%SRC_DIR%\i2cdriver_hdmi.c" ^
     "%DOOM_DIR%\hazard3_sao.c" ^
     "%DOOM_DIR%\doom_image_loader.c" ^
     "%DOOM_DIR%\doom_wad_loader.c" ^
@@ -234,7 +259,6 @@ if exist "%OUTPUT_MAP%" (
     echo   %OUTPUT_MAP%
     exit /b 1
 )
-
 if exist "%OUTPUT_BIN%" (
     echo ERROR: Could not remove:
     echo   %OUTPUT_BIN%

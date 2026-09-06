@@ -1,0 +1,67 @@
+/* -----------------------------------------------------------------------------
+ * File:        custom.css
+ * Path:        docs/_static/custom.css
+ *
+ * Project:     Hazard3-Doom
+ * Purpose:     Provide project-specific Read the Docs presentation tweaks and
+ *              compatibility-table styling.
+ *
+ * Copyright (c) 2026 gojimmypi
+ *
+ * Licensed under the Apache License, Version 2.0.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * This software is provided under the terms of the applicable license.
+ * See LICENSES/Apache-2.0.txt for the complete license terms.
+ * See LICENSING.md for project licensing policy and scope.
+ * -------------------------------------------------------------------------- */
+
+/* Small readability tweaks while keeping the stock Read the Docs look. */
+.wy-nav-content {
+    max-width: 1100px;
+}
+
+.rst-content code.literal,
+.rst-content tt.literal {
+    white-space: nowrap;
+}
+
+.rst-content .admonition-title {
+    font-weight: 700;
+}
+
+/* Driver compatibility indicators used by the ULX3S USB matrix. */
+.compat-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+
+.compat-table th,
+.compat-table td {
+    border: 1px solid #d6d6d6;
+    padding: 0.45em 0.6em;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.compat-table th:first-child,
+.compat-table td:first-child {
+    text-align: left;
+}
+
+.compat-dot {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    border-radius: 50%;
+    margin-right: 0.35em;
+    vertical-align: -0.05em;
+}
+
+.compat-yes { background: #2e9d50; }
+.compat-warn { background: #d89b00; }
+.compat-no { background: #c43d3d; }
+.compat-na { background: #7f8c8d; }
+

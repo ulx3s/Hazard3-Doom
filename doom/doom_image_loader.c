@@ -1,3 +1,22 @@
+/* -----------------------------------------------------------------------------
+ * File:        doom_image_loader.c
+ * Path:        doom/doom_image_loader.c
+ *
+ * Project:     Hazard3-Doom
+ * Purpose:     Receive, validate, preserve, restore, and launch Hazard3-Doom
+ *              executable images.
+ *
+ * Copyright (c) 2026 gojimmypi
+ *
+ * Licensed under the Apache License, Version 2.0.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * This software is provided under the terms of the applicable license.
+ * See LICENSES/Apache-2.0.txt for the complete license terms.
+ * See LICENSING.md for project licensing policy and scope.
+ * -------------------------------------------------------------------------- */
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -462,6 +481,14 @@ int doom_image_loader_load_stream(doom_image_stream_read_fn read_fn,
     return 1;
 }
 
+static uint32_t doom_screenbuffer_base(void)
+{
+    if (HAZARD3_VIDEO_FPGA_BUILD_ID == HAZARD3_FPGA_BUILD_ID_ULX3S_12F)
+        return HAZARD3_DOOM_SCREENBUFFER_12F_BASE;
+
+    return HAZARD3_DOOM_SCREENBUFFER_BASE;
+}
+
 int doom_image_loader_launch(void)
 {
     typedef int32_t (*doom_entry_fn_t)(const hazard3_monitor_services_t* services);
@@ -486,7 +513,7 @@ int doom_image_loader_launch(void)
         .wad_limit = HAZARD3_DOOM_WAD_LIMIT,
         .wad_bytes = doom_wad_loader_bytes(),
         .wad_name = doom_wad_loader_name(),
-        .screen_base = HAZARD3_DOOM_SCREENBUFFER_BASE,
+        .screen_base = doom_screenbuffer_base(),
         .screen_bytes = HAZARD3_DOOM_SCREENBUFFER_BYTES
     };
     doom_entry_fn_t entry;
@@ -505,6 +532,7 @@ int doom_image_loader_launch(void)
             "\r\nNo validated IWAD is loaded. Use the WAD uploader first.\r\n");
         return 0;
     }
+    hazard3_console_puts("\r\nDoom launch requested; restoring image...\r\n");
     hazard3_heap_reset();
     if (!restore_image_from_backup()) {
         ++launch_failure_count;
@@ -520,6 +548,7 @@ int doom_image_loader_launch(void)
     hazard3_console_puts(services.wad_name);
     hazard3_console_puts("\r\n");
     drain_uart_rx();
+    hazard3_console_puts("  transferring control to Doom...\r\n");
     hazard3_console_input_capture_begin();
     start_ticks = hazard3_ticks_ms();
     result = entry(&services);

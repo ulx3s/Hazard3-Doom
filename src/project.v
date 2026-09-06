@@ -1,7 +1,21 @@
-/*
- * Copyright (c) 2026 Your Name
+/* -----------------------------------------------------------------------------
+ * File:        project.v
+ * Path:        src/project.v
+ *
+ * Project:     Hazard3-Doom
+ * Purpose:     Implement the Tiny Tapeout FPGA smoke-test wrapper used by the
+ *              Hazard3-Doom repository.
+ *
+ * Copyright (c) 2026 gojimmypi
+ *
+ * Licensed under the Apache License, Version 2.0.
+ *
  * SPDX-License-Identifier: Apache-2.0
- */
+ *
+ * This software is provided under the terms of the applicable license.
+ * See LICENSES/Apache-2.0.txt for the complete license terms.
+ * See LICENSING.md for project licensing policy and scope.
+ * -------------------------------------------------------------------------- */
 
 `default_nettype none
 
@@ -20,7 +34,9 @@ module tt_um_ulx3s_example (
     input  wire [7:0] uio_in,   // IOs: Input path
     output wire [7:0] uio_out,  // IOs: Output path
     output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
+`ifdef USE_ANALOG
     inout  wire [7:0] ua,       // Analog pins, only ua[5:0] can be used
+`endif
     input  wire       ena,      // always 1 when the design is powered, so you can ignore it
     input  wire       clk,      // clock
     input  wire       rst_n     // reset_n - low to reset

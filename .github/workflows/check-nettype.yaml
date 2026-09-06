@@ -4,6 +4,10 @@ on:
     push:
     pull_request:
 
+permissions:
+    # explicit least-privilege setting for GITHUB_TOKEN, no write permissions needed
+    contents: read
+
 jobs:
     check-nettype:
         runs-on: ubuntu-latest
@@ -19,4 +23,7 @@ jobs:
 
                 chmod +x scripts/check-nettype.sh
 
-                scripts/check-nettype.sh
+                # Check only project-owned RTL. Vendored bootloader sources and
+                # submodules are intentionally outside this policy check.
+
+                ./scripts/check-nettype.sh

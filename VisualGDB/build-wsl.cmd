@@ -1,4 +1,23 @@
 @echo off
+REM -----------------------------------------------------------------------------
+REM File:        build-wsl.cmd
+REM Path:        VisualGDB/build-wsl.cmd
+REM
+REM Project:     Hazard3-Doom
+REM Purpose:     Dispatch build, clean, and rebuild actions from Windows and
+REM              VisualGDB into the repository's WSL build scripts.
+REM
+REM Copyright (c) 2026 gojimmypi
+REM
+REM Licensed under the Apache License, Version 2.0.
+REM
+REM SPDX-License-Identifier: Apache-2.0
+REM
+REM This software is provided under the terms of the applicable license.
+REM See LICENSES/Apache-2.0.txt for the complete license terms.
+REM See LICENSING.md for project licensing policy and scope.
+REM -----------------------------------------------------------------------------
+
 setlocal EnableExtensions DisableDelayedExpansion
 
 set "ACTION=%~1"
@@ -35,7 +54,7 @@ exit /b %RESULT%
 :clean
 call :enter_root
 if errorlevel 1 exit /b %ERRORLEVEL%
-wsl.exe --exec /bin/bash -c "rm -f -- ./build/hazard3-test.elf ./build/hazard3-test.map"
+wsl.exe --exec /bin/bash -c "rm -f -- ./build/hazard3-boot-monitor.elf ./build/hazard3-boot-monitor.map"
 set "RESULT=%ERRORLEVEL%"
 popd
 exit /b %RESULT%

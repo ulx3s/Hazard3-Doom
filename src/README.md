@@ -1,14 +1,39 @@
 # Hazard3-Doom/src
 
-This directory contains the source to:
+This directory contains the source files for the Hazard3-Doom resident boot monitor `hazard3-boot-monitor`
+and the Tiny Tapeout project template.
 
-## Doom Console Monitor Source
+## Hazard3-Doom Resident Boot Monitor
 
-- `link.ld`
-- `main.c`
-- `start.S`
+The resident boot monitor is the firmware that starts with the Hazard3-Doom system
+and provides the boot and console environment used before launching Doom.
+
+Core resident monitor files:
+
+- `link.ld` - linker script for the resident monitor
+- `main.c` - main resident monitor implementation
+- `start.S` - startup and entry code
 
 ## Tiny Tapeout Template Files
 
 - `config.json`
 - `project.v`
+
+The detailed ULX3S Tiny Tapeout FPGA build flow, including the
+`ulx3s/tt-gds-action` GitHub Action, the `ulx3s/tt-support-tools` backend,
+local build commands, generated artifacts, UART mapping, and troubleshooting,
+is documented in `docs/getting-started/tiny-tapeout-ulx3s.rst`.
+
+## ULX3S Chat and support
+
+### Discord channel
+
+- [https://discord.gg/qwMUk6W](https://discord.gg/qwMUk6W) (problems/question/general chat)
+
+### Gitter channel
+
+- [https://gitter.im/ulx3s/Lobby](https://gitter.im/ulx3s/Lobby) (Focused on development)
+
+### Email
+
+- [ulx3s.fpga@gmail.com](mailto:ulx3s.fpga@gmail.com) (If you do not use chats)

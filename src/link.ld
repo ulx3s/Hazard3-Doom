@@ -1,3 +1,21 @@
+/* -----------------------------------------------------------------------------
+ * File:        link.ld
+ * Path:        src/link.ld
+ *
+ * Project:     Hazard3-Doom
+ * Purpose:     Define the default resident Hazard3-Doom monitor memory layout.
+ *
+ * Copyright (c) 2026 gojimmypi
+ *
+ * Licensed under the Apache License, Version 2.0.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * This software is provided under the terms of the applicable license.
+ * See LICENSES/Apache-2.0.txt for the complete license terms.
+ * See LICENSING.md for project licensing policy and scope.
+ * -------------------------------------------------------------------------- */
+
 ENTRY(_start)
 
 MEMORY
@@ -38,8 +56,10 @@ SECTIONS
 
     /*
      * The upper 64 KiB of the physical 128 KiB SRAM is a dedicated Doom
-     * 320x200 indexed working screen. Keeping the renderer target out of the
-     * unified SDRAM cache leaves that cache available for code, WAD and heap.
+     * 320x200 indexed working screen. Keeping the Doom renderer target out of
+     * the unified SDRAM cache leaves that cache available for code, WAD and
+     * heap. Experimental higher-resolution HDMI presentation is scaled from
+     * this standard renderer buffer and does not enlarge the on-chip region.
      */
     __doom_screenbuffer_base = 0x00010000;
     __doom_screenbuffer_end = __doom_screenbuffer_base + 320 * 200;

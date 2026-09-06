@@ -1,0 +1,89 @@
+Profils de cartes
+=================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 16 28 14 24
+
+   * - Carte
+     - Profil mémoire
+     - Mémoire externe/contrôleur
+     - Horloge système
+     - Note vidéo/build
+   * - ULX3S 85F
+     - ``64m``
+     - SDR SDRAM 16 bits ; chemin du contrôleur natif ``ahb_sdram``
+     - 50 MHz
+     - 320x200 par défaut ; modes étendus disponibles
+   * - ULX3S 12F
+     - ``32m`` par défaut ; ``64m`` en option
+     - SDR SDRAM 16 bits ; chemin du contrôleur natif ``ahb_sdram``
+     - 40 MHz
+     - Scanout SDRAM compact 320x200
+   * - ULX4M-LD 85F
+     - ``64m``
+     - Profil DDR3/DDR3L Micron ``MT41K512M16HA`` ou Alliance ``AS4C256M16D3`` ; ``ahb_litedram`` + LiteDRAM généré/``ECP5DDRPHY``
+     - CPU/AHB 40 MHz ; port utilisateur LiteDRAM 60 MHz ; référence/init 25 MHz
+     - Micron qualifié sur le matériel ; profils générés propres au composant
+   * - ULX4M-LS 85F
+     - ``32m``
+     - SDR SDRAM 16 bits de 32 Mio ; chemin du contrôleur natif ``ahb_sdram``
+     - 50 MHz
+     - Chemin mémoire SDR natif
+
+Le moniteur, l'image Doom liée et la cartographie mémoire SDRAM doivent utiliser
+le même profil mémoire. Les wrappers de build complets pour chaque carte règlent
+automatiquement le profil et l'horloge propres à leur cible.
+
+Validation FPGA actuelle
+------------------------
+
+Les valeurs routées ci-dessous sont des points de contrôle de régression issus
+des builds du projet. Les révisions exactes, le SHA256 du netlist, les versions
+des outils CAD et les paramètres du sweep doivent être lus dans l'artifact
+correspondant ; ces valeurs ne sont pas des garanties de timing portables :
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 12 40 24
+
+   * - Carte
+     - Seed
+     - Résultat routé
+     - État
+   * - ULX3S 85F
+     - 55
+     - ``clk_sys`` 51.77 MHz
+     - PASS à 50 MHz
+   * - ULX3S 12F
+     - 65
+     - ``clk_sys`` 42.11 MHz
+     - PASS à 40 MHz
+   * - ULX4M-LD 85F
+     - 2
+     - ``clk_sys`` 43.94 MHz ; port utilisateur LiteDRAM 67.81 MHz
+     - PASS à 40 MHz / 60 MHz et DDR qualifiée sur le matériel
+
+Le point de contrôle ULX4M-LD qualifié utilise un netlist figé, le seed 2 et
+HeAP ``timingweight=30``. Le bitstream testé sur le matériel a pour SHA256
+``294602982dfc4a9906961f2e8b6f43de925d8c11a7e5e6bb0f5e392965a868de``.
+La carte équipée de mémoire Micron a réussi la suite complète de qualification
+DDR, le stress du heap, le test Doom et l'exécution RV32 depuis la DDR. Un
+nouveau netlist doit être routé puis qualifié à nouveau ; un PASS de timing seul
+ne suffit pas. Voir :doc:`timing-sweeps` pour la provenance et les règles de
+comparaison.
+
+Bases principales des périphériques ULX3S
+-----------------------------------------
+
+.. list-table::
+   :header-rows: 1
+
+   * - Périphérique
+     - Base
+   * - Pont SAO
+     - ``0x40009000``
+   * - SD SPI
+     - ``0x4000A000``
+   * - HDMI/vidéo
+     - ``0x4000C000``

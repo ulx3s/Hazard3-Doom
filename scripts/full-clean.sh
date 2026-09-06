@@ -1,4 +1,79 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
+# File:        full-clean.sh
+# Path:        scripts/full-clean.sh
+#
+# Project:     Hazard3-Doom
+# Purpose:     Clean supported FPGA synthesis outputs and remove the
+#              repository build tree.
+#
+# Copyright (c) 2026 gojimmypi
+#
+# Licensed under the Apache License, Version 2.0.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# This software is provided under the terms of the applicable license.
+# See LICENSES/Apache-2.0.txt for the complete license terms.
+# See LICENSING.md for project licensing policy and scope.
+# -----------------------------------------------------------------------------
+#
+# Full cleanup behavior:
+#
+# Removes entire Hazard3-Doom/build
+#
+# - Runs ShellCheck on this script when ShellCheck is installed and stops if
+#   linting fails.
+# - Accepts -n/--dry-run to report every cleanup operation without modifying
+#   files, and -h/--help to display usage.
+# - Resolves the Hazard3-Doom repository root from this script's location.
+# - Uses third_party/Hazard3 by default, or the checkout selected through
+#   HAZARD3_ROOT.
+# - Refuses to operate on "/" or on a directory that does not contain the
+#   expected scripts, doom, and src directories.
+# - Runs the clean targets from ULX3S.mk, ULX3S_12F.mk, and ULX4M_LD_85F.mk
+#   when those Makefiles exist; missing Makefiles are reported and skipped.
+# - The shared ECP5 clean rules remove each target's JSON, ASC, BIT, and
+#   synthesized Verilog files, along with synth.log, pnr.log, pnr*.log, and
+#   pnr_try*.asc from the Hazard3 example_soc/synth directory.
+# - The ULX3S 12F clean rule additionally removes its CONFIG, SVF, and
+#   memory-profile files from the Hazard3 synthesis directory.
+# - Removes the complete Hazard3-Doom build/ tree, including firmware,
+#   Doom images, FPGA outputs, timing stamps, routing sweeps, integration-test
+#   artifacts, logs, and other generated files stored below build/.
+# - Guards the recursive removal so that only the repository's exact build/
+#   path can be selected.
+# - Does not reset Git repositories or remove submodule source, WAD files, or
+#   checked-in LiteDRAM sources.
+#
+# Removed from third_party/Hazard3/example_soc/synth/
+#
+#   fpga_ulx3s.json
+#   fpga_ulx3s.asc
+#   fpga_ulx3s.bit
+#   fpga_ulx3s_synth.v
+#
+#   fpga_ulx3s_12f.json
+#   fpga_ulx3s_12f.asc
+#   fpga_ulx3s_12f.bit
+#   fpga_ulx3s_12f_synth.v
+#   fpga_ulx3s_12f.config
+#   fpga_ulx3s_12f.svf
+#   fpga_ulx3s_12f.memory-profile
+#
+#   fpga_ulx4m_ld.json
+#   fpga_ulx4m_ld.asc
+#   fpga_ulx4m_ld.bit
+#   fpga_ulx4m_ld_synth.v
+#
+#   synth.log
+#   pnr.log
+#   pnr*.log
+#   pnr_try*.asc
+#
+# Note: the pinned shared ECP5 clean rules do not remove CONFIG or SVF files
+# produced directly in example_soc/synth for the ULX3S 85F or ULX4M-LD targets.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -105,6 +180,7 @@ remove_build_tree()
 }
 
 run_make_clean ULX3S.mk
+run_make_clean ULX3S_12F.mk
 run_make_clean ULX4M_LD_85F.mk
 remove_build_tree "${BUILD_DIR}"
 

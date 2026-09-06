@@ -1,3 +1,22 @@
+/* -----------------------------------------------------------------------------
+ * File:        doom_image_main.c
+ * Path:        doom/doom_image_main.c
+ *
+ * Project:     Hazard3-Doom
+ * Purpose:     Initialize the loaded Doom image and enter the DoomGeneric
+ *              application runtime.
+ *
+ * Copyright (c) 2026 gojimmypi
+ *
+ * Licensed under the GNU General Public License, version 2 or later.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * This software is provided WITHOUT ANY WARRANTY.
+ * See LICENSES/GPL-2.0.txt for the complete license terms.
+ * See LICENSING.md for project licensing policy and scope.
+ * -------------------------------------------------------------------------- */
+
 #include <stdint.h>
 
 #include "doom_image_format.h"
@@ -41,6 +60,13 @@ static char* doom_arguments[] = {
 #endif
 };
 
+static int screen_service_is_valid(const hazard3_monitor_services_t* services)
+{
+    return services->screen_bytes >= HAZARD3_DOOM_SCREENBUFFER_BYTES &&
+        (services->screen_base == HAZARD3_DOOM_SCREENBUFFER_BASE ||
+         services->screen_base == HAZARD3_DOOM_SCREENBUFFER_12F_BASE);
+}
+
 static int services_are_valid(const hazard3_monitor_services_t* services)
 {
     return services != (const hazard3_monitor_services_t*)0 &&
@@ -57,14 +83,28 @@ static int services_are_valid(const hazard3_monitor_services_t* services)
         services->heap_limit == HAZARD3_DOOM_HEAP_LIMIT &&
         services->video_base == HAZARD3_VIDEO_BASE &&
         services->video_limit == HAZARD3_VIDEO_LIMIT &&
-        services->video_limit - services->video_base >= 2u * 320u * 200u &&
-        services->screen_base == HAZARD3_DOOM_SCREENBUFFER_BASE &&
-        services->screen_bytes >= HAZARD3_DOOM_SCREENBUFFER_BYTES &&
+        services->video_limit - services->video_base >=
+            HAZARD3_VIDEO_MINIMUM_RESERVE_BYTES &&
+        screen_service_is_valid(services) &&
         services->wad_base == HAZARD3_DOOM_WAD_BASE &&
         services->wad_limit == HAZARD3_DOOM_WAD_LIMIT &&
         services->wad_bytes >= 12u &&
         services->wad_bytes <= services->wad_limit - services->wad_base &&
         services->wad_name != (const char*)0;
+}
+
+static void print_wad_header(const hazard3_monitor_services_t* services)
+{
+    const volatile uint8_t* header =
+        (const volatile uint8_t*)(uintptr_t)services->wad_base;
+    uint32_t header_word = (uint32_t)header[0] |
+        ((uint32_t)header[1] << 8) |
+        ((uint32_t)header[2] << 16) |
+        ((uint32_t)header[3] << 24);
+
+    hazard3_console_puts("  H3DIV direct IWAD header=");
+    hazard3_console_put_hex32(header_word);
+    hazard3_console_puts("\r\n");
 }
 
 int32_t doom_image_main(const hazard3_monitor_services_t* services)
@@ -116,6 +156,7 @@ int32_t doom_image_main(const hazard3_monitor_services_t* services)
     }
 
     doom_arguments[2] = (char*)services->wad_name;
+    print_wad_header(services);
     hazard3_doom_input_reset();
     hazard3_console_puts("  entering Doom WAD discovery and initialization\r\n");
     doomgeneric_Create(
@@ -156,6 +197,7 @@ int32_t doom_image_main(const hazard3_monitor_services_t* services)
     while (!hazard3_doom_exit_requested()) {
         doomgeneric_Tick();
     }
+    hazard3_doom_screen_snip_cache();
     interactive_elapsed = hazard3_ticks_ms() - interactive_start_ticks;
     frame_count = hazard3_doom_draw_frame_count();
 

@@ -1,4 +1,23 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
+# File:        doom_build_flags.sh
+# Path:        doom/doom_build_flags.sh
+#
+# Project:     Hazard3-Doom
+# Purpose:     Define shared build-time feature flags for Hazard3-Doom Doom
+#              images.
+#
+# Copyright (c) 2026 gojimmypi
+#
+# Licensed under the Apache License, Version 2.0.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# This software is provided under the terms of the applicable license.
+# See LICENSES/Apache-2.0.txt for the complete license terms.
+# See LICENSING.md for project licensing policy and scope.
+# -----------------------------------------------------------------------------
+
 
 # Shared build flags for the Hazard3 Doom image and size probe.
 #
@@ -45,6 +64,33 @@ DOOM_ARCH_FLAGS=(
     -mabi=ilp32
 )
 
+# Select the Doom renderer and HDMI source resolution together. The standard
+# mode keeps the existing 320x200 on-chip working screen. The experimental
+# high-resolution mode renders and presents a native 400x240 indexed frame.
+video_resolution="${HAZARD3_DOOM_HDMI_RESOLUTION:-320x200}"
+case "${video_resolution}" in
+320x200)
+    DOOM_VIDEO_FLAGS=(
+        -DDOOMGENERIC_RESX=320
+        -DDOOMGENERIC_RESY=200
+    )
+    ;;
+400x240)
+    # Render Doom at the same 400x240 resolution consumed by the HDMI source.
+    # i_video.c uses a 96 KiB SDRAM-backed working screen in this mode because
+    # the monitor's dedicated on-chip screen reservation remains 320x200.
+    DOOM_VIDEO_FLAGS=(
+        -DDOOMGENERIC_RESX=400
+        -DDOOMGENERIC_RESY=240
+        -DHAZARD3_VIDEO_HIGH_RES=1
+    )
+    ;;
+*)
+    echo "Unsupported HAZARD3_DOOM_HDMI_RESOLUTION: ${video_resolution} (use 320x200 or 400x240)" >&2
+    return 1
+    ;;
+esac
+
 # This array is consumed by scripts that source this file.
 # shellcheck disable=SC2034
 DOOM_COMMON_COMPILE_FLAGS=(
@@ -64,8 +110,7 @@ DOOM_COMMON_COMPILE_FLAGS=(
     -DNORMALUNIX
     -DLINUX
     -DSNDSERV
-    -DDOOMGENERIC_RESX=320
-    -DDOOMGENERIC_RESY=200
+    "${DOOM_VIDEO_FLAGS[@]}"
     -DCMAP256
     -DDOOMGENERIC_EXTERNAL_SCREENBUFFER
     -DHAZARD3_SHARED_SCREENBUFFER

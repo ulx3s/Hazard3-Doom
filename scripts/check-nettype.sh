@@ -1,22 +1,40 @@
 #!/bin/bash
+# -----------------------------------------------------------------------------
+# File:        check-nettype.sh
+# Path:        scripts/check-nettype.sh
+#
+# Project:     Hazard3-Doom
+# Purpose:     Validate consistent default_nettype handling in tracked
+#              Verilog source files.
 #
 # Copyright (c) 2026 gojimmypi
+#
+# Licensed under the Apache License, Version 2.0.
+#
 # SPDX-License-Identifier: Apache-2.0
 #
+# This software is provided under the terms of the applicable license.
+# See LICENSES/Apache-2.0.txt for the complete license terms.
+# See LICENSING.md for project licensing policy and scope.
+# -----------------------------------------------------------------------------
+
 # file: scripts/check-nettype.sh
 #
-
 set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 fail=0
 expected_first='`default_nettype none'
 expected_last='`default_nettype wire'
 
-echo "Checking Verilog files..."
+echo "Checking Hazard3-Doom-owned Verilog files..."
 
-while IFS= read -r file; do
+while IFS= read -r -d '' file; do
     echo ""
     echo "Checking: $file"
+    file_path="${REPO_ROOT}/${file}"
 
     first_line=$(awk '
         BEGIN {
@@ -66,7 +84,7 @@ while IFS= read -r file; do
             print line
             exit
         }
-    ' "$file")
+    ' "${file_path}")
 
     last_line=$(awk '
         BEGIN {
@@ -119,7 +137,7 @@ while IFS= read -r file; do
         END {
             print last
         }
-    ' "$file")
+    ' "${file_path}")
 
     if [ "$first_line" != "$expected_first" ]; then
         echo "ERROR: First meaningful line is not $expected_first"
@@ -132,7 +150,11 @@ while IFS= read -r file; do
         echo "  Found: $last_line"
         fail=1
     fi
-done < <(find . -type f -name "*.v" | sort)
+done < <(
+    git -C "${REPO_ROOT}" ls-files -z -- \
+        ':(glob)src/**/*.v' \
+        ':(glob)tests/**/*.v'
+)
 
 echo ""
 

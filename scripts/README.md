@@ -1,74 +1,350 @@
 # Hazard3-Doom Scripts
 
-Build, setup, programming, debugging, validation, and cleanup utilities for the
-Hazard3-Doom ULX3S and ULX4M-LD targets.
+Build, setup, programming, debugging, validation, benchmarking, source-audit,
+and cleanup utilities for the Hazard3-Doom ULX3S and ULX4M-LD targets.
+
+The scripts are intended to be run from the repository root unless a script's
+usage text says otherwise. Most Bash scripts resolve the repository root from
+their own location, so they also work when launched from another directory.
+
+See the full Quick Start overview at https://ulx3s.github.io/ulx-doom/
+
+Sweep summaries:
+
+- [ULX3S-12F](./build-ulx3s-12f-sweep_summary.md)
+- [ULX3S-85F](./build-ulx3s-85f-sweep_summary.md)
+- [ULX4M-LD](./build-ulx4m-ld-sweep_summary.md)
 
 ## Quick Start
 
-- `build-ulx3s-doom.sh` - Builds the complete ULX3S Doom target: bitstream, monitor, and Doom image.
-- `build-ulx4m-ld-doom.sh` - Builds the complete ULX4M-LD Doom target: bitstream, monitor, and Doom image.
+Complete board builds:
 
-Existing nonempty FPGA bitstreams are reused and displayed with their modification
-timestamps. Set `FORCE_BITSTREAM_REBUILD=1` to run synthesis and nextpnr again.
+```bash
+./scripts/build-ulx3s-doom.sh
+./scripts/build-ulx3s-12f-doom.sh
+./scripts/build-ulx4m-ld-doom.sh
+```
 
-See the full Quick Start overview at https://ulx3s.github.io/ulx-doom/  
+The board wrappers build the monitor, FPGA bitstream, and Doom image with a
+matched memory/clock profile. Existing nonempty FPGA bitstreams may be reused
+where supported; set `FORCE_BITSTREAM_REBUILD=1` when a fresh route/bitstream is
+required. Normal bitstream builds synthesize before routing.
+
+For ULX4M-LD only, `SKIP_SYNTH=1` preserves and routes the existing synthesized
+`fpga_ulx4m_ld.json` instead of invoking Make/Yosys. Combine it with
+`FORCE_BITSTREAM_REBUILD=1` to reroute and repack a deliberately frozen netlist:
+
+```bash
+SKIP_SYNTH=1 \
+FORCE_BITSTREAM_REBUILD=1 \
+    ./scripts/build-ulx4m-ld-bitstream.sh
+```
+
+The frozen-netlist path requires the recorded system-clock and LiteDRAM-CPU
+profiles to match the requested build. It prints the JSON SHA256 before
+nextpnr and never deletes or replaces the JSON when a profile check fails.
+Synthesized JSON, synthesis logs, profile stamps, routed outputs, and sweep
+results are written below the main repository's ignored `build/` directory;
+the Hazard3 submodule supplies source files and constraints only.
+
+Current primary profiles are:
+
+| Target | Memory profile | Hazard3 clock | Doom/video profile |
+| --- | --- | --- | --- |
+| ULX3S 85F | `64m` | 50 MHz | 320x200 default; extended modes optional |
+| ULX3S 12F | `32m` default, `64m` optional | 40 MHz | 320x200 compact SDRAM scanout |
+| ULX4M-LD 85F | `64m` | 40 MHz | 320x200 default |
+
+The monitor, FPGA configuration, Doom image, and SDRAM map must use compatible
+settings. Do not mix 32 MiB and 64 MiB software images.
+
+The current build defaults are seed 11 for ULX3S 85F, seed `82` for ULX3S 12F,
+and seed `83` for ULX4M-LD. ULX4M-LD also defaults to `HeAP timingweight 30`, the
+simplest qualified setting from the 40/60 MHz ablation. These are convenience
+baselines, not permanent optima: rerun a seed sweep after placement-sensitive
+RTL, memory, video, clock, or toolchain changes.
 
 ## Build Scripts
 
-- `build.sh` - Builds the shared Hazard3 monitor firmware.
-- `build-ulx3s-85f-bitstream.sh` - Builds or reuses the ULX3S 85F FPGA bitstream.
-- `build-ulx3s-doom.sh` - Builds the complete ULX3S Doom target.
-- `build-ulx4m-ld-bitstream.sh` - Builds or reuses the ULX4M-LD 85F FPGA bitstream.
-- `build-ulx4m-ld-doom.sh` - Builds the complete ULX4M-LD Doom target.
-- `build-xpack.cmd` - Builds the Hazard3 firmware on Windows using the configured xPack RISC-V GCC toolchain.
-- `sweep.sh` - Forces a rebuild for each nextpnr seed and saves every timing result and bitstream.
+- `build.sh` - Builds the shared Hazard3 monitor firmware. Defaults to the 64 MiB map at 50 MHz; accepts `HAZARD3_MEMORY_PROFILE`, `HAZARD3_SYS_CLK_HZ`, `HAZARD3_BUILD_DIR`, `TOOLCHAIN_PREFIX`, and `HAZARD3_MONITOR_LINKER_SCRIPT` overrides.
+- `build-ecp5-bitstream-common.sh` - Internal shared ECP5 synthesis/place-and-route implementation used by the board-specific bitstream wrappers. Normally do not invoke it directly.
+- `build-ulx3s-85f-bitstream.sh` - ULX3S 85F entry point for the shared ECP5 flow.
+- `build-ulx3s-doom.sh` - Complete ULX3S 85F build: monitor, boot image, FPGA bitstream, Doom image, and SD-card staging files under `build/ulx3s/`.
+- `build-ulx3s-12f-bitstream.sh` - ULX3S 12F entry point for the shared ECP5 flow. Defaults to `HAZARD3_MEMORY_PROFILE=32m`.
+- `build-ulx3s-12f-doom.sh` - Complete ULX3S 12F build. Uses a 40 MHz Hazard3 clock, defaults to the 32 MiB map, and intentionally accepts only `HAZARD3_DOOM_HDMI_RESOLUTION=320x200`.
+- `build-ulx4m-ld-bitstream.sh` - ULX4M-LD 85F entry point for the shared ECP5 flow. Supports `SKIP_SYNTH=1` for routing an existing frozen JSON without invoking Make/Yosys.
+- `build-ulx4m-ld-doom.sh` - Complete ULX4M-LD 85F build using the 64 MiB map at 40 MHz, including LiteDRAM inputs and the embedded resident monitor under `build/ulx4m-ld/`. The default route uses seed 83 with HeAP timingweight 30.
+- `build-xpack.cmd` - Native Windows monitor build using the repository xPack RISC-V GCC installation. Supports `build`, `clean`, and `rebuild` plus memory-profile and clock arguments.
+- `make-boot-hex.py` - Converts the monitor binary into the hexadecimal initialization format consumed by FPGA boot memory.
 
-## Setup Scripts
+### ULX3S 12F compact target
 
-- `doomgeneric-version.sh` - Defines the pinned DoomGeneric repository and commit.
-- `setup-doomgeneric.sh` - Validates the pinned DoomGeneric checkout and required source files.
-- `setup-submodules.sh` - Initializes the repository submodules required for building.
-- `setup-xpack-riscv-gcc.cmd` - Configures and validates the xPack RISC-V GCC toolchain used by the Windows scripts.
+The 12F and 85F use the same ULX3S board wiring, pin constraints, CPU ISA, SD
+interface, and SAO/ESP32 peripherals. The 12F profile changes the EBR-heavy
+storage architecture: the monitor executes from external SDRAM and HDMI uses a
+compact line-buffered scanout path.
+
+The normal 12F build defaults to the 32 MiB profile:
+
+```bash
+./scripts/build-ulx3s-12f-doom.sh
+```
+
+Use a 64 MiB SDRAM map only when the hardware and all software images are
+intended to use that map:
+
+```bash
+HAZARD3_MEMORY_PROFILE=64m ./scripts/build-ulx3s-12f-doom.sh
+```
+
+After programming the FPGA and starting OpenOCD, load the SDRAM-resident monitor
+with:
+
+```bash
+./scripts/load-firmware-12f.sh
+```
+
+The 12F build intentionally supports the standard 320x200 Doom/video path only.
+
+### ULX3S 85F HDMI framebuffer profiles
+
+The ULX3S 85F build supports a lean standard framebuffer and an extended profile.
+The complete 85F wrapper defaults to extended modes enabled.
+
+```bash
+HAZARD3_HDMI_EXTENDED_MODES=0 ./scripts/build-ulx3s-doom.sh
+HAZARD3_HDMI_EXTENDED_MODES=1 ./scripts/build-ulx3s-doom.sh
+```
+
+Use the standard profile for unrelated FPGA development or when only 320x200 is
+needed. Use the extended profile when testing the optional larger video modes.
+Changing the requested profile invalidates incompatible synthesized output.
+
+## Seed Sweep and Timing Scripts
+
+Placement-only sweeps are ranking aids. Routed sweeps are authoritative for
+final timing. The common routed-sweep entry point is `sweep-ecp5.sh`; it
+dispatches to the board-specific implementation so local runs and GitHub
+Actions use the same routing code.
+
+Supported routed targets:
+
+```text
+ulx3s-85f
+ulx3s-12f
+ulx4m-ld-85f
+```
+
+Examples:
+
+```bash
+./scripts/sweep-ecp5.sh ulx3s-85f 178
+SWEEP_JOBS=8 ./scripts/sweep-ecp5.sh ulx3s-85f --all
+
+HAZARD3_MEMORY_PROFILE=32m \
+SWEEP_JOBS=8 \
+    ./scripts/sweep-ecp5.sh ulx3s-12f 1-64
+
+HAZARD3_ULX4M_SYS_CLK_MHZ=40 \
+ULX4M_LITEDRAM_CPU=serv \
+SWEEP_JOBS=8 \
+    ./scripts/sweep-ecp5.sh ulx4m-ld-85f 48,130,176,223
+```
+
+The target-specific scripts remain directly usable:
+
+- `sweep-ulx3s-85f.sh` - ULX3S 85F full routed sweep.
+- `sweep.sh` - backward-compatible alias for `sweep-ulx3s-85f.sh`.
+- `sweep-ulx3s-12f.sh` - ULX3S 12F full routed sweep.
+- `sweep-ulx4m-ld.sh` - ULX4M-LD 85F full routed sweep.
+- `sweep-peek.sh` - ULX3S 85F placement-only prescreen.
+- `sweep-peek-ulx3s-12f.sh` - ULX3S 12F placement-only prescreen.
+- `sweep-peek-ulx3s-12f-best-peek.sh` - routes selected strong 12F placement candidates.
+
+All routed targets accept explicit seeds, comma-separated seeds, ranges such as
+`1-32`, or `--all`. `SWEEP_JOBS` controls local concurrency. Each target writes
+`metadata.txt`, per-seed result CSV files, and an aggregate results CSV. The
+ULX3S targets also retain routed bitstreams locally. ULX4M-LD results are under
+`build/ulx4m-ld-seed-sweep/<clock>-<cpu><tuning>/`.
+
+Each nextpnr route is limited by `SWEEP_ROUTE_TIMEOUT_SECONDS`, which defaults
+to 7200 seconds. `SWEEP_ROUTE_KILL_AFTER_SECONDS` defaults to 30 seconds and
+allows a route that ignores `SIGTERM` to be killed. A timed-out route is
+recorded with `timing_status=TIMEOUT` and the sweep continues with the remaining
+seeds; it is not treated as a tool failure. For example:
+
+```bash
+SWEEP_ROUTE_TIMEOUT_SECONDS=900 \
+    ./scripts/sweep-ecp5.sh ulx3s-85f 1-32
+```
+
+The GitHub seed-sweep workflow also applies a 720-second whole-seed watchdog
+around each `sweep-ecp5.sh` invocation. This is a second safety net for hangs
+outside nextpnr itself; the normal nextpnr timeout should fire first.
+
+Common optional nextpnr tuning is available on every routed target:
+
+```bash
+SWEEP_NEXTPNR_PLACER=heap
+SWEEP_NEXTPNR_ROUTER=router2
+SWEEP_NEXTPNR_HEAP_TIMINGWEIGHT=30
+SWEEP_NEXTPNR_HEAP_CRITEXP=3
+SWEEP_NEXTPNR_TMG_RIPUP=1
+SWEEP_NEXTPNR_ROUTER2_ALT_WEIGHTS=1
+SWEEP_NEXTPNR_EXTRA_ARGS='...'
+```
+
+The GitHub workflow `.github/workflows/ulx4m-ld-seed-sweep.yml` is now a
+parameterized ECP5 seed-sweep workflow despite the retained historical filename.
+Select the target and seed range with `workflow_dispatch`. The prepare job
+synthesizes one frozen netlist; route jobs use `SWEEP_SKIP_SYNTH=1` against that
+exact netlist, and the final summary is generated by
+`summarize-ecp5-sweep.py`. Synthesis and routing OSS CAD Suite snapshots can be
+selected independently for nextpnr A/B testing.
+
+`SWEEP_PREPARE_ONLY=1` and `SWEEP_SKIP_SYNTH=1` are primarily CI plumbing, but
+they are also useful for controlled local experiments where multiple routes
+must use exactly the same synthesized JSON.
+
+Run a new routed sweep whenever the FPGA netlist changes materially. A seed that
+was optimal for an earlier design is not expected to remain optimal after EBR,
+clock, cache, framebuffer, or other placement-sensitive changes.
+
+## Submodule, Fork, and Source Status
+
+These scripts have different purposes and should not be treated as substitutes
+for one another.
+
+- `setup-submodules.sh` - Initializes the submodules needed for normal builds: top-level DoomGeneric and Hazard3 plus Hazard3's nested `scripts` and `example_soc/libfpga`. Set `HAZARD3_INIT_ALL_SUBMODULES=1` to initialize the entire recursive tree.
+- `doomgeneric-version.sh` - Defines the pinned DoomGeneric repository and commit used by the build helpers.
+- `setup-doomgeneric.sh` - Validates the pinned DoomGeneric checkout and required source files; intentional dirty development trees require `HAZARD3_DOOM_ALLOW_DIRTY_DOOMGENERIC=1`.
+- `hazard3-submodule.sh` - Bash inspection/restoration helper. `status` reports Hazard3 and DoomGeneric; `diff` and `restore` operate on Hazard3 and its pinned nested tree.
+- `update-hazard3-submodule.sh` - Explicitly advances, reports, or restores the Hazard3 gitlink. It does not modify `.gitmodules`; use `update`, `status`, or `restore`.
+- `check_submodules.bat` - Windows local-state safety check. It compares each checkout with the parent HEAD/index and with the configured branch from the matching `.gitmodules` URL. It checks top-level submodules and the nested `third_party/Hazard3/example_soc/libfpga` gitlink.
+- `hazard3-doom-source-status.sh` - Network-wide fork/branch audit. It fetches every branch into temporary bare repositories, discovers actual default branches, compares branch tips within and across forks, and writes the report to both the terminal and `build/source_status.log`. Current families are Hazard3-Doom, DoomGeneric, Hazard3, and Hazard3-libfpga/libfpga.
+
+The local checker answers "is this working tree and recorded gitlink safe and
+current for its configured branch?" The source-status report answers "what
+branches exist across the related forks and how do their histories compare?"
+
+Typical use:
+
+```bash
+./scripts/hazard3-doom-source-status.sh
+./scripts/hazard3-submodule.sh status
+./scripts/update-hazard3-submodule.sh status
+```
+
+From Windows Command Prompt:
+
+```bat
+scripts\check_submodules.bat
+```
 
 ## Programming and Debugging
 
-- `hazard3-debug.gdb` - Provides GDB commands for connecting to and debugging Hazard3 through OpenOCD.
-- `load-firmware.bat` - Loads and starts the monitor firmware through GDB and OpenOCD on Windows.
-- `load-firmware.sh` - Loads and starts the monitor firmware through GDB and OpenOCD on Linux or WSL.
-- `load-fpga-bitstream.bat` - Programs the FPGA with a generated or prebuilt bitstream on Windows.
-- `start-openocd.bat` - Starts the OpenOCD server with the repository configuration on Windows.
-- `start-openocd.sh` - Starts the OpenOCD server with the repository configuration on Linux or WSL.
+- `start-openocd.sh` - Starts OpenOCD on Linux/WSL using the repository ULX3S configuration; converts paths when a Windows `.exe` is used from WSL.
+- `start-openocd.bat` - Starts the Windows OpenOCD server using the repository configuration.
+- `load-firmware.sh` - Loads, verifies, starts, and disconnects the normal monitor ELF through a running GDB/OpenOCD server.
+- `load-firmware-12f.sh` - Loads the ULX3S 12F SDRAM-resident monitor after FPGA configuration.
+- `load-firmware.bat` - Windows monitor loader through GDB/OpenOCD.
+- `load-fpga-bitstream.bat` - Windows FPGA bitstream loader.
+- `flash-ulx3s-persistent.sh` - Programs the built ULX3S 85F bitstream into persistent SPI flash for cold boot; requires `build/fpga_ulx3s.bit`.
+- `hazard3-debug.gdb` - GDB command definitions used for source-level Hazard3 debugging through OpenOCD.
+- `return-to-monitor.py` - Sends Ctrl-X over UART to stop a running Doom instance and return to the resident monitor; defaults to `/dev/ttyS7` at 115200 baud.
+- `restart-from-monitor.py` - Sends monitor command `j` over UART to start the already loaded Doom image; defaults to `/dev/ttyS7` at 115200 baud.
 
-## Validation and Cleanup
+### GDB command files
 
-- `check_submodules.bat` - Reports the current and expected Git submodule revisions on Windows.
-- `check-nettype.sh` - Checks Verilog sources for consistent `default_nettype` directives.
-- `full-clean.sh` - Removes generated ULX3S, ULX4M-LD, monitor, and Doom build outputs.
+The `gdb/` directory contains focused command scripts for monitor and SAO tests:
+
+- `gdb/load-hazard3-test-elf.gdb` - GDB command sequence for loading the Hazard3 test/monitor ELF.
+- `gdb/sao-probe.gdb` - Probe SAO bridge state from GDB.
+- `gdb/sao-scan.gdb` - Exercise the SAO I2C scan path from GDB.
+- `gdb/sao-touchwheel-test.gdb` - Interactive/debug test sequence for the SAO touchwheel.
+- `gdb/sao-touchwheel-led-off.gdb` - Turns off the touchwheel LED from GDB.
+
+## CoreMark and ELF Inspection
+
+- `build-coremark.sh` - Builds the Hazard3 CoreMark port. Supports `baseline` and `tuned` build profiles, configurable iteration count, and supported 25/50 MHz timing profiles.
+- `run-coremark.sh` - Runs or qualifies CoreMark images over the target UART. Supports `performance`, `validation`, and `qualify` modes and stores run logs/results under the CoreMark build directory.
+- `peek-elf.sh` - Inspects a linked RISC-V ELF/map, selected multilib, ISA attributes, and libgcc/archive selection. With no arguments it examines the baseline CoreMark output.
+
+## Validation, Repository Hygiene, and VisualGDB
+
+- `check-executable.sh` - Checks recently changed tracked shell scripts for the Git executable bit; defaults to the most recent five commits.
+- `git-exe.sh` - Sets the Git executable bit for one tracked file and prints the resulting index entry.
+- `check-nettype.sh` - Checks Git-tracked project RTL in `src/` and `tests/` for consistent `default_nettype` handling; vendored bootloader and submodule sources are excluded.
+- `generate-ecp5-seed-matrix.py` - Generates grouped seed jobs for the ECP5 sweep workflow without embedding Python in workflow YAML.
+- `test-scripts.sh` - Runs syntax, lint, and safe smoke checks across the top-level Bash, Python, PowerShell, Windows command, and GDB script files. Add `--integration` to execute complete board builds and routed two-seed samples for every ECP5 target. Integration logs and isolated software products are written below `build/script-tests/`; normal FPGA and sweep products remain below `build/`. Hardware programming, UART/GDB sessions, intentionally mutating checkout operations, and destructive cleanup are excluded. The runner verifies that tracked repository and submodule state is unchanged.
+
+Fast validation and the longer integration sample are separate:
+
+```bash
+./scripts/test-scripts.sh
+./scripts/test-scripts.sh --integration
+./scripts/test-scripts.sh --integration --dry-run
+```
+
+The integration sample defaults to board-specific timing-passing seeds: `11` and
+`178` for ULX3S 85F, `82` and `37` for ULX3S 12F, and 83 and 45 for ULX4M-LD. Override
+one list with `SCRIPT_TEST_ULX3S_85F_SEEDS`,
+`SCRIPT_TEST_ULX3S_12F_SEEDS`, or `SCRIPT_TEST_ULX4M_LD_SEEDS`.
+`SCRIPT_TEST_SWEEP_SEEDS` overrides all three lists, and
+`SCRIPT_TEST_SWEEP_JOBS` sets route concurrency. For example:
+
+```bash
+SCRIPT_TEST_SWEEP_SEEDS="11 178" \
+SCRIPT_TEST_SWEEP_JOBS=2 \
+    ./scripts/test-scripts.sh --integration
+```
+
+A completed sweep with no timing-passing sampled seed is a warning, not a
+PASS. Set `SCRIPT_TEST_REQUIRE_TIMING_PASS=1` to make that condition fail the
+test run.
+- `check-windows-visualgdb.ps1` - Validates the native-Windows VisualGDB/NMake configuration and expected xPack monitor build commands.
+- `check-wsl-visualgdb.ps1` - Validates the WSL VisualGDB bridge, expected build/debug paths, and LF-only tracked shell scripts.
+- `inventory.sh` - Inventories Git-tracked files in the selected path and writes deterministic Markdown, TSV, and SHA-256 reports. It intentionally uses Git's index instead of walking ignored/untracked toolchains.
+- `INVENTORY.md` - Human-readable generated inventory for the scripts directory.
+- `INVENTORY.tsv` - Machine-readable generated inventory.
+- `INVENTORY.sha256` - SHA-256 list for the generated inventory set.
+- `full-clean.sh` - Cleans supported FPGA synthesis targets and removes the repository `build/` tree. Use `--dry-run` to preview; submodules, WADs, and checked-in LiteDRAM sources are preserved.
+
+## Setup and Toolchain Helpers
+
+- `setup-xpack-riscv-gcc.cmd` - Installs/configures the xPack GNU RISC-V Embedded GCC toolchain under `bin/riscv-gcc` for native Windows builds.
 
 ## Supercon Helpers
 
-The normal Hazard3-Doom build remains normal. The Supercon demo uses a separate,
-explicit noncombat image and one canonical WAD source.
+The normal Hazard3-Doom build remains unchanged by the Supercon helper flow.
+The demo uses a dedicated noncombat image and a separately generated WAD.
 
-- `build-doom-noncombat.sh` - builds `build/doom-image-noncombat/hazard3-doom.h3d` with 200% armor, zero ammo, no pistol ownership, no weapon/fist overlay, and Fire disabled.
-- `apply-doom-noncombat.py` - internal transform used only on the generated DoomGeneric build copy.
-- `build-supercon10-wad.py` - verifies the fixed-heading PWAD and merges it with local `wads/DOOM1.WAD` into `wads/SUPERCON10.WAD`.
-- `return-to-monitor.py` - sends Ctrl-X over UART and releases the serial port.
-- `cleanup-supercon-dev.py` - dry-run cleanup for exact obsolete files from earlier iterations; add `--apply` only after reviewing the list.
+- `build-doom-noncombat.sh` - Builds `build/doom-image-noncombat/hazard3-doom.h3d` with the dedicated noncombat source transform and verifies marker symbols in the compiled objects.
+- `apply-doom-noncombat.py` - Internal transform applied only to the prepared DoomGeneric build copy; it does not edit the submodule.
+- `build-supercon10-wad.py` - Verifies the Supercon PWAD, merges it with a local `wads/DOOM1.WAD`, verifies expected banner textures, and writes `wads/SUPERCON10.WAD` by default.
+- `cleanup-supercon-dev.py.bak` - Retained backup of an older development cleanup helper; it is not part of the normal supported workflow.
 
-From the repository root:
+Example:
 
 ```bash
 ./scripts/build-doom-noncombat.sh
 ./scripts/build-supercon10-wad.py
-
 ./scripts/return-to-monitor.py --port /dev/ttyS7
 ./doom/upload-doom-image.py ./build/doom-image-noncombat/hazard3-doom.h3d --port /dev/ttyS7
 ./doom/upload-wad.py ./wads/SUPERCON10.WAD --port /dev/ttyS7 --launch
 ```
 
-The normal Doom image still builds to `build/doom-image/hazard3-doom.h3d`.
+## Directory Inventory Summary
 
-## Documentation
+The directory intentionally contains several types of files:
 
-- `README.md` - Describes every build, setup, programming, debugging, validation, and cleanup file in this directory.
+- `*.sh` - Linux/WSL build, validation, sweep, setup, programming, and audit helpers.
+- `*.bat` / `*.cmd` - Native Windows programming, build, and submodule helpers.
+- `*.ps1` - VisualGDB configuration validation.
+- `*.py` - Host-side transforms, UART control, packaging, and generation helpers.
+- `*.gdb` and `gdb/*.gdb` - GDB command files for Hazard3 and SAO debugging.
+- `INVENTORY.*` - Generated file inventory/hash reports; regenerate them with `./scripts/inventory.sh ./scripts` when tracked contents change.
+- `README.md` - This directory-level reference.
+
+The Read the Docs version of the script reference is in
+`docs/reference/scripts.rst`.

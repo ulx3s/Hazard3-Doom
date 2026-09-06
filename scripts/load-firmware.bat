@@ -1,4 +1,23 @@
 @echo off
+rem -----------------------------------------------------------------------------
+rem File:        load-firmware.bat
+rem Path:        scripts/load-firmware.bat
+rem
+rem Project:     Hazard3-Doom
+rem Purpose:     Load and start the Hazard3 resident monitor through
+rem              GDB/OpenOCD on Windows.
+rem
+rem Copyright (c) 2026 gojimmypi
+rem
+rem Licensed under the Apache License, Version 2.0.
+rem
+rem SPDX-License-Identifier: Apache-2.0
+rem
+rem This software is provided under the terms of the applicable license.
+rem See LICENSES/Apache-2.0.txt for the complete license terms.
+rem See LICENSING.md for project licensing policy and scope.
+rem -----------------------------------------------------------------------------
+
 setlocal EnableExtensions
 
 rem Resolve the repository root from this script's location.
@@ -13,7 +32,7 @@ if not exist "%GDB%" if exist "%LOCAL_GDB%" set "GDB=%LOCAL_GDB%"
 
 rem Use the first argument as the ELF path, or use the default build output.
 if "%~1"=="" (
-    set "ELF=%ROOT_DIR%\build\hazard3-test.elf"
+    set "ELF=%ROOT_DIR%\build\hazard3-boot-monitor.elf"
 ) else (
     set "ELF=%~1"
 )
@@ -25,7 +44,7 @@ if not exist "%GDB%" (
 
 if not exist "%ELF%" (
     >&2 echo Missing firmware ELF: %ELF%
-    >&2 echo Expected the firmware at: %ROOT_DIR%\build\hazard3-test.elf or specify the prebuilt image in ./bin/ directory.
+    >&2 echo Expected the firmware at: %ROOT_DIR%\build\hazard3-boot-monitor.elf or specify the prebuilt image in ./bin/ directory.
     exit /b 1
 )
 

@@ -1,3 +1,22 @@
+/* -----------------------------------------------------------------------------
+ * File:        doomgeneric_hazard3.c
+ * Path:        doom/doomgeneric_hazard3.c
+ *
+ * Project:     Hazard3-Doom
+ * Purpose:     Implement the DoomGeneric video, palette, timing, and input
+ *              backend for Hazard3-Doom.
+ *
+ * Copyright (c) 2026 gojimmypi
+ *
+ * Licensed under the GNU General Public License, version 2 or later.
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * This software is provided WITHOUT ANY WARRANTY.
+ * See LICENSES/GPL-2.0.txt for the complete license terms.
+ * See LICENSING.md for project licensing policy and scope.
+ * -------------------------------------------------------------------------- */
+
 #include <stdint.h>
 
 #include "doomgeneric.h"
@@ -15,6 +34,13 @@
 #define HAZARD3_VIDEO_PRESENT_TIMEOUT_MS 1000u
 #define HAZARD3_UART_KEY_HOLD_MS 120u
 #define HAZARD3_ESCAPE_SEQUENCE_TIMEOUT_MS 40u
+#define HAZARD3_SCREEN_SNIP_CAPABILITY_REQUEST 0x1cu
+#define HAZARD3_SCREEN_SNIP_CAPABILITY_ACK 0x06u
+#define HAZARD3_SCREEN_SNIP_REQUEST 0x1du
+#define HAZARD3_SCREEN_SNIP_HEADER_STANDARD \
+    "\r\nH3SNIP1 320 200 1024 600 IDX8 256 64000\r\n"
+#define HAZARD3_SCREEN_SNIP_HEADER_HIGH \
+    "\r\nH3SNIP1 400 240 1024 600 IDX8 256 96000\r\n"
 
 static uint32_t draw_frame_count;
 static uint32_t back_buffer_index;
@@ -41,6 +67,7 @@ static uint8_t escape_sequence_state;
 static uint32_t escape_sequence_deadline_ms;
 static uint8_t deferred_character;
 static int deferred_character_valid;
+static int screen_snip_requested;
 
 static uint32_t read_cycle_counter(void)
 {
@@ -97,6 +124,16 @@ static int wait_for_dma_complete(uint32_t present_count_before)
     }
 }
 
+/* GCC 12.2.0 used by the Hazard3 toolchain can ICE when it turns a bit-11
+ * test into a direct 0x800 mask. Keep this helper out of line and make the
+ * shifted value volatile so GCC must perform the shift before testing bit 0. */
+static __attribute__((noinline)) int video_high_resolution_supported(uint32_t status)
+{
+    volatile uint32_t shifted_status = status >> 11u;
+
+    return (shifted_status & 1u) != 0u;
+}
+
 void DG_Init(void)
 {
     uint32_t video_base = hazard3_video_base();
@@ -104,38 +141,240 @@ void DG_Init(void)
     uint32_t status = HAZARD3_VIDEO_STATUS;
     uint32_t front_buffer =
         (status & HAZARD3_VIDEO_STATUS_FRONT_BUFFER) != 0u ? 1u : 0u;
+    uint32_t internal_buffer =
+        (status & HAZARD3_VIDEO_STATUS_INTERNAL_BUFFER) != 0u ? 1u : 0u;
 
     draw_frame_count = 0u;
-    back_buffer_index = front_buffer ^ 1u;
     palette_bank_valid_mask = 0u;
     video_failure_reported = 0;
     copy_cycles_total = 0u;
     present_cycles_total = 0u;
     last_copy_cycles = 0u;
     last_present_cycles = 0u;
+    screen_snip_requested = 0;
     direct_video_available =
         (status & HAZARD3_VIDEO_STATUS_DIRECT_SUPPORTED) != 0u;
+    back_buffer_index = (direct_video_available
+        ? internal_buffer : front_buffer) ^ 1u;
     video_available = video_base == HAZARD3_VIDEO_FRAMEBUFFER0_BASE
         && video_limit >= video_base
-        && video_limit - video_base >= 2u * HAZARD3_VIDEO_FRAMEBUFFER_BYTES
-        && (status & HAZARD3_VIDEO_STATUS_SDRAM_READY) != 0u;
+        && video_limit - video_base >= HAZARD3_VIDEO_MINIMUM_RESERVE_BYTES
+        && (status & HAZARD3_VIDEO_STATUS_SDRAM_READY) != 0u
+        && (HAZARD3_VIDEO_HIGH_RES_ENABLED == 0u ||
+            video_high_resolution_supported(status));
 
     hazard3_console_puts(
-        "Doom platform: indexed renderer + direct block-RAM HDMI initialized\r\n");
+        direct_video_available
+            ? "Doom platform: indexed renderer + direct block-RAM HDMI initialized\r\n"
+            : "Doom platform: indexed renderer + SDRAM scanout HDMI initialized\r\n");
+#ifdef HAZARD3_VIDEO_HIGH_RES
+    hazard3_console_puts(
+        "  renderer: 320x200; HDMI source: 400x240 EXPERIMENTAL\r\n");
+#else
+    hazard3_console_puts("  renderer/HDMI source: 320x200 standard\r\n");
+#endif
     hazard3_console_puts(
         direct_video_available
             ? "  presentation path: direct APB-to-EBR\r\n"
-            : "  presentation path: legacy SDRAM staging/DMA\r\n");
+            : "  presentation path: SDRAM staging / hardware scanout\r\n");
     if (!video_available) {
         hazard3_console_puts("Doom HDMI performance interface: FAIL\r\n");
     }
 }
 
+#ifdef HAZARD3_VIDEO_HIGH_RES
+static uint32_t pack_indexed_pixels(
+    uint8_t p0,
+    uint8_t p1,
+    uint8_t p2,
+    uint8_t p3)
+{
+    return (uint32_t)p0 | ((uint32_t)p1 << 8) |
+        ((uint32_t)p2 << 16) | ((uint32_t)p3 << 24);
+}
+#endif
+
+static void screen_snip_put_word(uint32_t pixels)
+{
+    hazard3_console_putc((uint8_t)pixels);
+    hazard3_console_putc((uint8_t)(pixels >> 8));
+    hazard3_console_putc((uint8_t)(pixels >> 16));
+    hazard3_console_putc((uint8_t)(pixels >> 24));
+}
+
+static void screen_snip_send(const uint32_t* source_words)
+{
+    if (source_words == (const uint32_t*)0) {
+        return;
+    }
+
+#ifdef HAZARD3_VIDEO_HIGH_RES
+    hazard3_console_puts(HAZARD3_SCREEN_SNIP_HEADER_HIGH);
+#else
+    hazard3_console_puts(HAZARD3_SCREEN_SNIP_HEADER_STANDARD);
+#endif
+
+    for (uint32_t i = 0u; i < 256u; ++i) {
+        hazard3_console_putc(color_to_rgb332(&colors[i]));
+    }
+
+#ifdef HAZARD3_VIDEO_HIGH_RES
+    const uint8_t* source_pixels = (const uint8_t*)source_words;
+    uint32_t source_y;
+
+    for (source_y = 0u; source_y < HAZARD3_VIDEO_STANDARD_HEIGHT; ++source_y) {
+        const uint8_t* source_row = source_pixels +
+            source_y * HAZARD3_VIDEO_STANDARD_WIDTH;
+        uint32_t repeat_count = source_y % 5u == 0u ? 2u : 1u;
+        uint32_t repeat;
+
+        for (repeat = 0u; repeat < repeat_count; ++repeat) {
+            uint32_t source_x;
+
+            for (source_x = 0u;
+                 source_x < HAZARD3_VIDEO_STANDARD_WIDTH;
+                 source_x += 16u) {
+                const uint8_t* p = source_row + source_x;
+
+                screen_snip_put_word(pack_indexed_pixels(
+                    p[0], p[0], p[1], p[2]));
+                screen_snip_put_word(pack_indexed_pixels(
+                    p[3], p[4], p[4], p[5]));
+                screen_snip_put_word(pack_indexed_pixels(
+                    p[6], p[7], p[8], p[8]));
+                screen_snip_put_word(pack_indexed_pixels(
+                    p[9], p[10], p[11], p[12]));
+                screen_snip_put_word(pack_indexed_pixels(
+                    p[12], p[13], p[14], p[15]));
+            }
+        }
+    }
+#else
+    for (uint32_t i = 0u; i < HAZARD3_VIDEO_WORDS; ++i) {
+        screen_snip_put_word(source_words[i]);
+    }
+#endif
+}
+
+void hazard3_doom_screen_snip_cache(void)
+{
+    const uint32_t* source_words = (const uint32_t*)DG_ScreenBuffer;
+    volatile hazard3_screen_snip_cache_t* cache =
+        (volatile hazard3_screen_snip_cache_t*)(uintptr_t)
+            HAZARD3_SCREEN_SNIP_CACHE_BASE;
+
+    if (source_words == (const uint32_t*)0) {
+        return;
+    }
+
+    cache->magic = 0u;
+    cache->magic_inverse = 0u;
+    hazard3_memory_barrier();
+    cache->version = HAZARD3_SCREEN_SNIP_CACHE_VERSION;
+#ifdef HAZARD3_VIDEO_HIGH_RES
+    cache->source_width = HAZARD3_VIDEO_HIGH_WIDTH;
+    cache->source_height = HAZARD3_VIDEO_HIGH_HEIGHT;
+    cache->pixel_bytes = HAZARD3_VIDEO_HIGH_BYTES;
+#else
+    cache->source_width = HAZARD3_VIDEO_STANDARD_WIDTH;
+    cache->source_height = HAZARD3_VIDEO_STANDARD_HEIGHT;
+    cache->pixel_bytes = HAZARD3_VIDEO_STANDARD_BYTES;
+#endif
+    cache->palette_bytes = HAZARD3_SCREEN_SNIP_PALETTE_BYTES;
+    cache->reserved = 0u;
+
+    for (uint32_t i = 0u; i < HAZARD3_SCREEN_SNIP_PALETTE_BYTES; ++i) {
+        cache->palette[i] = color_to_rgb332(&colors[i]);
+    }
+
+#ifdef HAZARD3_VIDEO_HIGH_RES
+    {
+        const uint8_t* source_pixels = (const uint8_t*)source_words;
+        uint32_t destination = 0u;
+
+        for (uint32_t source_y = 0u;
+             source_y < HAZARD3_VIDEO_STANDARD_HEIGHT;
+             ++source_y) {
+            const uint8_t* source_row = source_pixels +
+                source_y * HAZARD3_VIDEO_STANDARD_WIDTH;
+            uint32_t repeat_count = source_y % 5u == 0u ? 2u : 1u;
+
+            for (uint32_t repeat = 0u; repeat < repeat_count; ++repeat) {
+                for (uint32_t source_x = 0u;
+                     source_x < HAZARD3_VIDEO_STANDARD_WIDTH;
+                     source_x += 16u) {
+                    const uint8_t* p = source_row + source_x;
+                    static const uint8_t map[20] = {
+                        0u, 0u, 1u, 2u, 3u, 4u, 4u, 5u, 6u, 7u,
+                        8u, 8u, 9u, 10u, 11u, 12u, 12u, 13u, 14u, 15u
+                    };
+
+                    for (uint32_t i = 0u; i < 20u; ++i) {
+                        cache->pixels[destination++] = p[map[i]];
+                    }
+                }
+            }
+        }
+    }
+#else
+    {
+        const uint8_t* source_pixels = (const uint8_t*)source_words;
+
+        for (uint32_t i = 0u; i < HAZARD3_VIDEO_STANDARD_BYTES; ++i) {
+            cache->pixels[i] = source_pixels[i];
+        }
+    }
+#endif
+
+    hazard3_memory_barrier();
+    cache->magic_inverse = ~HAZARD3_SCREEN_SNIP_CACHE_MAGIC;
+    hazard3_memory_barrier();
+    cache->magic = HAZARD3_SCREEN_SNIP_CACHE_MAGIC;
+    hazard3_memory_barrier();
+}
+
 static void copy_frame_direct(const uint32_t* source_words)
 {
-    HAZARD3_VIDEO_DIRECT_ADDRESS =
-        back_buffer_index != 0u ? 0x00008000u : 0u;
+    HAZARD3_VIDEO_DIRECT_ADDRESS = hazard3_video_direct_halfword_base(
+        back_buffer_index, HAZARD3_VIDEO_HIGH_RES_ENABLED != 0u);
 
+#ifdef HAZARD3_VIDEO_HIGH_RES
+    /*
+     * Doom itself remains a 320x200 renderer. Four source pixels expand to
+     * five HDMI-source pixels; five source rows expand to six output rows.
+     * Processing 16 source pixels at once produces five aligned 32-bit writes.
+     */
+    const uint8_t* source_pixels = (const uint8_t*)source_words;
+    uint32_t source_y;
+
+    for (source_y = 0u; source_y < HAZARD3_VIDEO_STANDARD_HEIGHT; ++source_y) {
+        const uint8_t* source_row = source_pixels +
+            source_y * HAZARD3_VIDEO_STANDARD_WIDTH;
+        uint32_t repeat_count = source_y % 5u == 0u ? 2u : 1u;
+        uint32_t repeat;
+
+        for (repeat = 0u; repeat < repeat_count; ++repeat) {
+            uint32_t source_x;
+
+            for (source_x = 0u;
+                 source_x < HAZARD3_VIDEO_STANDARD_WIDTH;
+                 source_x += 16u) {
+                const uint8_t* p = source_row + source_x;
+
+                HAZARD3_VIDEO_DIRECT_DATA = pack_indexed_pixels(
+                    p[0], p[0], p[1], p[2]);
+                HAZARD3_VIDEO_DIRECT_DATA = pack_indexed_pixels(
+                    p[3], p[4], p[4], p[5]);
+                HAZARD3_VIDEO_DIRECT_DATA = pack_indexed_pixels(
+                    p[6], p[7], p[8], p[8]);
+                HAZARD3_VIDEO_DIRECT_DATA = pack_indexed_pixels(
+                    p[9], p[10], p[11], p[12]);
+                HAZARD3_VIDEO_DIRECT_DATA = pack_indexed_pixels(
+                    p[12], p[13], p[14], p[15]);
+            }
+        }
+    }
+#else
     for (uint32_t i = 0u; i < HAZARD3_VIDEO_WORDS; i += 8u) {
         HAZARD3_VIDEO_DIRECT_DATA = source_words[i + 0u];
         HAZARD3_VIDEO_DIRECT_DATA = source_words[i + 1u];
@@ -146,12 +385,50 @@ static void copy_frame_direct(const uint32_t* source_words)
         HAZARD3_VIDEO_DIRECT_DATA = source_words[i + 6u];
         HAZARD3_VIDEO_DIRECT_DATA = source_words[i + 7u];
     }
+#endif
 }
 
 static void copy_frame_legacy(
     volatile uint32_t* destination_words,
     const uint32_t* source_words)
 {
+#ifdef HAZARD3_VIDEO_HIGH_RES
+    const uint8_t* source_pixels = (const uint8_t*)source_words;
+    uint32_t destination_y = 0u;
+    uint32_t source_y;
+
+    for (source_y = 0u; source_y < HAZARD3_VIDEO_STANDARD_HEIGHT; ++source_y) {
+        const uint8_t* source_row = source_pixels +
+            source_y * HAZARD3_VIDEO_STANDARD_WIDTH;
+        uint32_t repeat_count = source_y % 5u == 0u ? 2u : 1u;
+        uint32_t repeat;
+
+        for (repeat = 0u; repeat < repeat_count; ++repeat) {
+            volatile uint32_t* destination_row = destination_words +
+                destination_y * (HAZARD3_VIDEO_HIGH_WIDTH / 4u);
+            uint32_t source_x;
+            uint32_t destination_word = 0u;
+
+            for (source_x = 0u;
+                 source_x < HAZARD3_VIDEO_STANDARD_WIDTH;
+                 source_x += 16u) {
+                const uint8_t* p = source_row + source_x;
+
+                destination_row[destination_word++] = pack_indexed_pixels(
+                    p[0], p[0], p[1], p[2]);
+                destination_row[destination_word++] = pack_indexed_pixels(
+                    p[3], p[4], p[4], p[5]);
+                destination_row[destination_word++] = pack_indexed_pixels(
+                    p[6], p[7], p[8], p[8]);
+                destination_row[destination_word++] = pack_indexed_pixels(
+                    p[9], p[10], p[11], p[12]);
+                destination_row[destination_word++] = pack_indexed_pixels(
+                    p[12], p[13], p[14], p[15]);
+            }
+            ++destination_y;
+        }
+    }
+#else
     for (uint32_t i = 0u; i < HAZARD3_VIDEO_WORDS; i += 8u) {
         destination_words[i + 0u] = source_words[i + 0u];
         destination_words[i + 1u] = source_words[i + 1u];
@@ -162,6 +439,7 @@ static void copy_frame_legacy(
         destination_words[i + 6u] = source_words[i + 6u];
         destination_words[i + 7u] = source_words[i + 7u];
     }
+#endif
 }
 
 void DG_DrawFrame(void)
@@ -216,6 +494,7 @@ void DG_DrawFrame(void)
                     ? HAZARD3_VIDEO_CONTROL_BUFFER1 : 0u)
                 | (direct_video_available
                     ? HAZARD3_VIDEO_CONTROL_DIRECT : 0u)
+                | HAZARD3_VIDEO_MODE_CONTROL
                 | HAZARD3_VIDEO_CONTROL_PRESENT;
 
             // Direct presentation only queues a vertical-blank bank swap.
@@ -236,11 +515,18 @@ void DG_DrawFrame(void)
         }
     }
 
+    if (screen_snip_requested && source_words != (const uint32_t*)0) {
+        screen_snip_requested = 0;
+        screen_snip_send(source_words);
+    }
+
     ++draw_frame_count;
     if (draw_frame_count == 1u) {
         hazard3_console_puts(
             video_available
-                ? "Doom renderer: first direct block-RAM frame queued\r\n"
+                ? (direct_video_available
+                    ? "Doom renderer: first direct block-RAM frame queued\r\n"
+                    : "Doom renderer: first SDRAM scanout frame queued\r\n")
                 : "Doom renderer: first headless frame completed\r\n");
     }
 }
@@ -446,6 +732,16 @@ int DG_GetKey(int* pressed, unsigned char* key)
             return 0;
         }
 
+        if (character == HAZARD3_SCREEN_SNIP_CAPABILITY_REQUEST) {
+            hazard3_console_putc(HAZARD3_SCREEN_SNIP_CAPABILITY_ACK);
+            return 0;
+        }
+
+        if (character == HAZARD3_SCREEN_SNIP_REQUEST) {
+            screen_snip_requested = 1;
+            return 0;
+        }
+
         if (escape_sequence_state != 0u) {
             if (decode_escape_sequence(character, key)) {
                 return emit_key_down(
@@ -521,6 +817,7 @@ void hazard3_doom_input_reset(void)
     escape_sequence_deadline_ms = 0u;
     deferred_character = 0u;
     deferred_character_valid = 0;
+    screen_snip_requested = 0;
 }
 
 int hazard3_doom_exit_requested(void)

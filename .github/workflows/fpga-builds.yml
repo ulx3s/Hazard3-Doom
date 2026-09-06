@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  # explicit least-privilege setting for GITHUB_TOKEN, no write permissions needed
   contents: read
 
 concurrency:
@@ -34,11 +35,27 @@ jobs:
           - name: ULX3S 85F
             board: ulx3s-85f
             command: ./scripts/build-ulx3s-doom.sh
-            bitstream: build/ulx3s/fpga_ulx3s.bit
+            fpga_name: fpga_ulx3s
+            monitor_dir: build/ulx3s/monitor
+            doom_dir: build/ulx3s/doom-image
+            seed_required: false
+            boot_init: build/ulx3s/hazard3-boot-monitor.hex
+          - name: ULX3S 12F
+            board: ulx3s-12f
+            command: ./scripts/build-ulx3s-12f-doom.sh
+            fpga_name: fpga_ulx3s_12f
+            monitor_dir: build/ulx3s-12f/monitor
+            doom_dir: build/ulx3s-12f/doom-image
+            seed_required: true
+            boot_init: build/ulx3s-12f/hazard3-12f-bootstrap.hex
           - name: ULX4M-LD 85F
             board: ulx4m-ld-85f
             command: ./scripts/build-ulx4m-ld-doom.sh
-            bitstream: build/ulx4m-ld/fpga_ulx4m_ld.bit
+            fpga_name: fpga_ulx4m_ld
+            monitor_dir: build/ulx4m-ld/monitor
+            doom_dir: build/ulx4m-ld/doom-image
+            seed_required: true
+            boot_init: build/ulx4m-ld/hazard3-boot-monitor.hex
 
     steps:
       - name: Check out repository
@@ -94,20 +111,34 @@ jobs:
           python3 --version
 
       - name: Initialize required submodules
-        run: ./scripts/setup-submodules.sh
+        run: |
+          # refresh submodules and show branch status in build/source_status.log
+          ./scripts/setup-submodules.sh
+          ./scripts/hazard3-doom-source-status.sh
+
+          # Hazard3 also has submodules that may be interesting, but not directly related
+          ./scripts/hazard3-submodule.sh status
 
       - name: Build FPGA, monitor, and Doom image
         env:
           FORCE_BITSTREAM_REBUILD: "1"
-          ALLOW_TIMING_FAILURE: "1"
+
         run: |
-          # Produce a fresh P&R result. Timing logs remain artifacts for review;
-          # known timing misses do not hide synthesis, packaging, or integration failures.
+          # Produce a fresh P&R result. All release board builds must close
+          # timing; exploratory timing-allow-fail runs belong in sweep jobs.
           ${{ matrix.command }}
 
-          test -s "${{ matrix.bitstream }}"
-          test -s build/hazard3-test.elf
-          test -s build/doom-image/hazard3-doom.h3d
+          test -s "build/${{ matrix.fpga_name }}.bit"
+          test -s "build/${{ matrix.fpga_name }}.config"
+          test -s "build/${{ matrix.fpga_name }}.svf"
+          test -s "build/${{ matrix.fpga_name }}.pnr.log"
+          test -s "build/${{ matrix.fpga_name }}.synth.log"
+          if [[ "${{ matrix.seed_required }}" == "true" ]]; then
+              test -s "build/${{ matrix.fpga_name }}.seed"
+          fi
+          test -s "${{ matrix.monitor_dir }}/hazard3-boot-monitor.elf"
+          test -s "${{ matrix.doom_dir }}/hazard3-doom.h3d"
+          test -s "${{ matrix.boot_init }}"
 
       - name: Upload build artifacts and timing logs
         if: always()
@@ -115,14 +146,15 @@ jobs:
         with:
           name: ${{ matrix.board }}-${{ github.sha }}
           path: |
-            ${{ matrix.bitstream }}
-            build/hazard3-test.elf
-            build/hazard3-test.map
-            build/doom-image/hazard3-doom.elf
-            build/doom-image/hazard3-doom.map
-            build/doom-image/hazard3-doom.h3d
-            third_party/Hazard3/example_soc/synth/synth.log
-            third_party/Hazard3/example_soc/synth/pnr.log
+            build/${{ matrix.fpga_name }}.*
+            build/source_status.log
+            ${{ matrix.monitor_dir }}/hazard3-boot-monitor.elf
+            ${{ matrix.monitor_dir }}/hazard3-boot-monitor.map
+            ${{ matrix.monitor_dir }}/hazard3-boot-monitor.bin
+            ${{ matrix.doom_dir }}/hazard3-doom.elf
+            ${{ matrix.doom_dir }}/hazard3-doom.map
+            ${{ matrix.doom_dir }}/hazard3-doom.h3d
+            ${{ matrix.boot_init }}
           if-no-files-found: warn
           retention-days: 14
           compression-level: 0

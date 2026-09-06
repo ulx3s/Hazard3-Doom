@@ -1,3 +1,22 @@
+/* -----------------------------------------------------------------------------
+ * File:        main.c
+ * Path:        src/main.c
+ *
+ * Project:     Hazard3-Doom
+ * Purpose:     Implement the resident Hazard3-Doom boot monitor, console,
+ *              diagnostics, and launch control.
+ *
+ * Copyright (c) 2026 gojimmypi
+ *
+ * Licensed under the Apache License, Version 2.0.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * This software is provided under the terms of the applicable license.
+ * See LICENSES/Apache-2.0.txt for the complete license terms.
+ * See LICENSING.md for project licensing policy and scope.
+ * -------------------------------------------------------------------------- */
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -33,6 +52,15 @@
 
 #define UART_FSTAT_TX_FULL    (1u << 8)
 #define UART_FSTAT_RX_EMPTY   (1u << 25)
+
+#define SCREEN_SNIP_CAPABILITY_REQUEST 0x1cu
+#define SCREEN_SNIP_CAPABILITY_ACK     0x06u
+#define SCREEN_SNIP_CAPABILITY_NAK     0x15u
+#define SCREEN_SNIP_REQUEST            0x1du
+#define SCREEN_SNIP_HEADER_STANDARD \
+    "\r\nH3SNIP1 320 200 1024 600 IDX8 256 64000\r\n"
+#define SCREEN_SNIP_HEADER_HIGH \
+    "\r\nH3SNIP1 400 240 1024 600 IDX8 256 96000\r\n"
 
 #define DOOM_UART_CAPTURE_BYTES 64u
 #define DOOM_UART_CAPTURE_MASK  (DOOM_UART_CAPTURE_BYTES - 1u)
@@ -82,6 +110,7 @@
     (SDRAM_BANK_COUNT - 1u) + 2u)
 
 #define SDRAM_DIAGNOSTIC_BYTES     (1024u * 1024u)
+#define SDRAM_12F_MONITOR_PROTECTED_BYTES (256u * 1024u)
 #define SDRAM_DOOM_IMAGE_BYTES     (3u * 1024u * 1024u)
 #define SDRAM_VIDEO_RESERVED_BYTES (4u * 1024u * 1024u)
 #define VIDEO_FRAMEBUFFER_BASE     HAZARD3_VIDEO_FRAMEBUFFER0_BASE
@@ -107,8 +136,20 @@
 #error "SDRAM_RANDOM_TEST_BYTES must fit within one SDRAM bank"
 #endif
 
+#if SDRAM_RANDOM_TEST_BYTES + SDRAM_12F_MONITOR_PROTECTED_BYTES > SDRAM_BANK_BYTES
+#error "The shifted 12F random test must fit within one SDRAM bank"
+#endif
+
 #if SDRAM_FULL_TEST_BYTES > SDRAM_DIAGNOSTIC_BYTES
 #error "The sequential SDRAM test must stay below the heap"
+#endif
+
+#if SDRAM_12F_MONITOR_PROTECTED_BYTES >= SDRAM_DIAGNOSTIC_BYTES
+#error "The 12F monitor protection must leave diagnostic SDRAM available"
+#endif
+
+#if (3u * SDRAM_12F_MONITOR_PROTECTED_BYTES) >= SDRAM_DIAGNOSTIC_BYTES
+#error "The 12F sparse-test reference must fit in diagnostic SDRAM"
 #endif
 
 #if SDRAM_DOOM_IMAGE_LIMIT > SDRAM_HEAP_LIMIT
@@ -282,7 +323,7 @@ static void console_print_help(void)
 {
     uart_puts("\r\nCommands:\r\n");
     uart_puts("  h or ?  help\r\n");
-    uart_puts("  m       destructive reserved 1 MiB SDRAM test (heap-safe)\r\n");
+    uart_puts("  m       destructive reserved SDRAM sequential test (heap-safe)\r\n");
     uart_puts("  a       sparse ");
     uart_puts(HAZARD3_SDRAM_PROFILE_NAME);
     uart_puts(" address/bank alias test\r\n");
@@ -312,7 +353,8 @@ static int is_ulx4m_ld_build(uint32_t fpga_build_id)
 
 static int is_ulx3s_build(uint32_t fpga_build_id)
 {
-    return fpga_build_id == HAZARD3_FPGA_BUILD_ID_ULX3S;
+    return fpga_build_id == HAZARD3_FPGA_BUILD_ID_ULX3S ||
+        fpga_build_id == HAZARD3_FPGA_BUILD_ID_ULX3S_12F;
 }
 
 static int build_ids_match(uint32_t fpga_build_id,
@@ -459,6 +501,95 @@ static uint8_t video_test_pattern_pixel(uint32_t x, uint32_t y)
     return pixel;
 }
 
+static volatile hazard3_screen_snip_cache_t* screen_snip_cache(void)
+{
+    return (volatile hazard3_screen_snip_cache_t*)(uintptr_t)
+        HAZARD3_SCREEN_SNIP_CACHE_BASE;
+}
+
+static int screen_snip_cache_valid(void)
+{
+    const volatile hazard3_screen_snip_cache_t* cache;
+    uint32_t width;
+    uint32_t height;
+    uint32_t pixel_bytes;
+
+    if (!external_memory_ready()) {
+        return 0;
+    }
+
+    cache = screen_snip_cache();
+    if (cache->magic != HAZARD3_SCREEN_SNIP_CACHE_MAGIC ||
+        cache->magic_inverse != ~HAZARD3_SCREEN_SNIP_CACHE_MAGIC ||
+        cache->version != HAZARD3_SCREEN_SNIP_CACHE_VERSION ||
+        cache->palette_bytes != HAZARD3_SCREEN_SNIP_PALETTE_BYTES) {
+        return 0;
+    }
+
+    width = cache->source_width;
+    height = cache->source_height;
+    pixel_bytes = cache->pixel_bytes;
+
+    return (width == HAZARD3_VIDEO_STANDARD_WIDTH &&
+            height == HAZARD3_VIDEO_STANDARD_HEIGHT &&
+            pixel_bytes == HAZARD3_VIDEO_STANDARD_BYTES) ||
+        (width == HAZARD3_VIDEO_HIGH_WIDTH &&
+            height == HAZARD3_VIDEO_HIGH_HEIGHT &&
+            pixel_bytes == HAZARD3_VIDEO_HIGH_BYTES);
+}
+
+static void screen_snip_cache_save_rgb332(
+    const volatile uint8_t* pixels,
+    uint32_t width,
+    uint32_t height)
+{
+    volatile hazard3_screen_snip_cache_t* cache = screen_snip_cache();
+    uint32_t pixel_bytes = width * height;
+
+    cache->magic = 0u;
+    cache->magic_inverse = 0u;
+    memory_barrier();
+
+    cache->version = HAZARD3_SCREEN_SNIP_CACHE_VERSION;
+    cache->source_width = width;
+    cache->source_height = height;
+    cache->palette_bytes = HAZARD3_SCREEN_SNIP_PALETTE_BYTES;
+    cache->pixel_bytes = pixel_bytes;
+    cache->reserved = 0u;
+
+    for (uint32_t i = 0u; i < HAZARD3_SCREEN_SNIP_PALETTE_BYTES; ++i) {
+        cache->palette[i] = (uint8_t)i;
+    }
+    for (uint32_t i = 0u; i < pixel_bytes; ++i) {
+        cache->pixels[i] = pixels[i];
+    }
+
+    memory_barrier();
+    cache->magic_inverse = ~HAZARD3_SCREEN_SNIP_CACHE_MAGIC;
+    memory_barrier();
+    cache->magic = HAZARD3_SCREEN_SNIP_CACHE_MAGIC;
+    memory_barrier();
+}
+
+static void screen_snip_send_cached(void)
+{
+    const volatile hazard3_screen_snip_cache_t* cache = screen_snip_cache();
+
+    if (!screen_snip_cache_valid()) {
+        uart_putc(SCREEN_SNIP_CAPABILITY_NAK);
+        return;
+    }
+
+    uart_puts(cache->source_width == HAZARD3_VIDEO_HIGH_WIDTH
+        ? SCREEN_SNIP_HEADER_HIGH : SCREEN_SNIP_HEADER_STANDARD);
+    for (uint32_t i = 0u; i < cache->palette_bytes; ++i) {
+        uart_putc(cache->palette[i]);
+    }
+    for (uint32_t i = 0u; i < cache->pixel_bytes; ++i) {
+        uart_putc(cache->pixels[i]);
+    }
+}
+
 static int video_present_rgb332_buffer0(uint32_t timeout_ms)
 {
     uint32_t start_ticks = system_ticks;
@@ -509,10 +640,18 @@ static void video_write_test_pattern(void)
 
     memory_barrier();
     presented = video_present_rgb332_buffer0(1000u);
+    if (presented) {
+        screen_snip_cache_save_rgb332(
+            (const volatile uint8_t*)(uintptr_t)destination,
+            VIDEO_FRAMEBUFFER_WIDTH,
+            VIDEO_FRAMEBUFFER_HEIGHT);
+    }
     ++video_pattern_runs;
     video_pattern_last_elapsed_ms = system_ticks - start_ticks;
 
-    uart_puts("  block-RAM present: ");
+    uart_puts(HAZARD3_VIDEO_FPGA_BUILD_ID == HAZARD3_FPGA_BUILD_ID_ULX3S_12F
+        ? "  SDRAM line-buffered present: "
+        : "  block-RAM present: ");
     uart_puts(presented ? "PASS" : "FAIL");
     uart_puts(" elapsed_ms=");
     uart_put_hex32(video_pattern_last_elapsed_ms);
@@ -717,6 +856,42 @@ void hazard3_heap_reset(void)
     sdram_heap_reset();
 }
 
+static uint32_t sdram_protected_low_bytes(void)
+{
+    if (HAZARD3_VIDEO_FPGA_BUILD_ID == HAZARD3_FPGA_BUILD_ID_ULX3S_12F) {
+        return SDRAM_12F_MONITOR_PROTECTED_BYTES;
+    }
+
+    return 0u;
+}
+
+static uint32_t sdram_sequential_test_base(void)
+{
+    return SDRAM_BASE + sdram_protected_low_bytes();
+}
+
+static uint32_t sdram_sequential_test_bytes(uint32_t requested_bytes)
+{
+    uint32_t available_bytes = SDRAM_DIAGNOSTIC_BYTES -
+        sdram_protected_low_bytes();
+
+    return requested_bytes < available_bytes ? requested_bytes : available_bytes;
+}
+
+static uint32_t sdram_sparse_reference_offset(void)
+{
+    uint32_t protected_bytes = sdram_protected_low_bytes();
+
+    /*
+     * The 12F monitor executes from physical SDRAM 0x20000000-0x2003ffff.
+     * Its diagnostic alias therefore must not probe the equivalent low
+     * addresses. Use bits 18 and 19 as the reference point so XOR-testing
+     * either of those bits remains at or above the protected boundary.
+     * Other targets retain the historical zero-based sparse test.
+     */
+    return protected_bytes == 0u ? 0u : protected_bytes * 3u;
+}
+
 static int sdram_destructive_test_allowed(const char* test_name)
 {
     if (!external_memory_require_ready(test_name)) {
@@ -765,11 +940,11 @@ static int sdram_check_word(
     return 1;
 }
 
-static int sdram_width_test(void)
+static int sdram_width_test(uint32_t base_address)
 {
-    volatile uint32_t* const word = (volatile uint32_t*)SDRAM_BASE;
-    volatile uint16_t* const halfwords = (volatile uint16_t*)SDRAM_BASE;
-    volatile uint8_t* const bytes = (volatile uint8_t*)SDRAM_BASE;
+    volatile uint32_t* const word = (volatile uint32_t*)(uintptr_t)base_address;
+    volatile uint16_t* const halfwords = (volatile uint16_t*)(uintptr_t)base_address;
+    volatile uint8_t* const bytes = (volatile uint8_t*)(uintptr_t)base_address;
     int passed = 1;
 
     *word = 0x11223344u;
@@ -803,9 +978,12 @@ static int sdram_width_test(void)
     return passed;
 }
 
-static uint32_t sdram_pattern_value(uint32_t word_index, uint32_t pattern)
+static uint32_t sdram_pattern_value(
+    uint32_t base_address,
+    uint32_t word_index,
+    uint32_t pattern)
 {
-    uint32_t byte_address = SDRAM_BASE + word_index * sizeof(uint32_t);
+    uint32_t byte_address = base_address + word_index * sizeof(uint32_t);
 
     switch (pattern) {
     case SDRAM_PATTERN_ZERO:
@@ -839,20 +1017,26 @@ static const char* sdram_pattern_name(uint32_t pattern)
     }
 }
 
-static int sdram_pattern_test(uint32_t byte_count, uint32_t pattern)
+static int sdram_pattern_test(
+    uint32_t base_address,
+    uint32_t byte_count,
+    uint32_t pattern)
 {
-    volatile uint32_t* const words = (volatile uint32_t*)SDRAM_BASE;
+    volatile uint32_t* const words =
+        (volatile uint32_t*)(uintptr_t)base_address;
     uint32_t word_count = byte_count / sizeof(uint32_t);
     uint32_t failures_before = sdram_last_failures;
 
     for (uint32_t i = 0u; i < word_count; ++i) {
-        words[i] = sdram_pattern_value(i, pattern);
+        words[i] = sdram_pattern_value(base_address, i, pattern);
     }
 
     memory_barrier();
 
     for (uint32_t i = 0u; i < word_count; ++i) {
-        (void)sdram_check_word(&words[i], sdram_pattern_value(i, pattern));
+        (void)sdram_check_word(
+            &words[i],
+            sdram_pattern_value(base_address, i, pattern));
     }
 
     return sdram_last_failures == failures_before;
@@ -903,6 +1087,7 @@ static uint32_t sdram_sparse_offset(uint32_t point)
 {
     uint32_t address_bit_count = 0u;
     uint32_t byte_count = SDRAM_SIZE_BYTES;
+    uint32_t reference_offset = sdram_sparse_reference_offset();
 
     while (byte_count > sizeof(uint32_t)) {
         byte_count >>= 1u;
@@ -910,11 +1095,11 @@ static uint32_t sdram_sparse_offset(uint32_t point)
     }
 
     if (point == 0u) {
-        return 0u;
+        return reference_offset;
     }
 
     if (point <= address_bit_count) {
-        return 1u << (point + 1u);
+        return reference_offset ^ (1u << (point + 1u));
     }
 
     point -= address_bit_count + 1u;
@@ -1066,7 +1251,7 @@ static int sdram_run_random_test(void)
     int passed = 1;
 
     uart_puts("\r\nSDRAM pseudorandom test: base=");
-    uart_put_hex32(SDRAM_BASE);
+    uart_put_hex32(SDRAM_BASE + sdram_protected_low_bytes());
     uart_puts(" bytes_per_bank=");
     uart_put_hex32(SDRAM_RANDOM_TEST_BYTES);
     uart_puts(" banks=");
@@ -1077,7 +1262,8 @@ static int sdram_run_random_test(void)
         SDRAM_RANDOM_TEST_BYTES * SDRAM_RANDOM_TEST_PASSES);
 
     for (uint32_t pass = 0u; pass < SDRAM_RANDOM_TEST_PASSES; ++pass) {
-        uint32_t base_offset = pass * SDRAM_BANK_BYTES;
+        uint32_t base_offset = pass * SDRAM_BANK_BYTES +
+            sdram_protected_low_bytes();
         uint32_t seed = 0x13579bdfu ^ (0x9e3779b9u * (pass + 1u));
         int pass_passed;
 
@@ -1108,19 +1294,21 @@ static int sdram_run_random_test(void)
 
 static int sdram_run_test(uint32_t byte_count, const char* description)
 {
+    uint32_t base_address = sdram_sequential_test_base();
+    uint32_t test_bytes = sdram_sequential_test_bytes(byte_count);
     uint32_t start_ticks;
     int passed;
 
     uart_puts("\r\n");
     uart_puts(description);
     uart_puts(": base=");
-    uart_put_hex32(SDRAM_BASE);
+    uart_put_hex32(base_address);
     uart_puts(" bytes=");
-    uart_put_hex32(byte_count);
+    uart_put_hex32(test_bytes);
     uart_puts("\r\n  access widths: ");
 
-    start_ticks = sdram_test_begin(byte_count);
-    passed = sdram_width_test();
+    start_ticks = sdram_test_begin(test_bytes);
+    passed = sdram_width_test(base_address);
     uart_puts(passed ? "PASS\r\n" : "FAIL\r\n");
 
     for (uint32_t pattern = 0u; pattern < SDRAM_PATTERN_COUNT; ++pattern) {
@@ -1130,7 +1318,7 @@ static int sdram_run_test(uint32_t byte_count, const char* description)
         uart_puts(sdram_pattern_name(pattern));
         uart_puts(": ");
 
-        pattern_passed = sdram_pattern_test(byte_count, pattern);
+        pattern_passed = sdram_pattern_test(base_address, test_bytes, pattern);
         uart_puts(pattern_passed ? "PASS\r\n" : "FAIL\r\n");
         passed &= pattern_passed;
     }
@@ -1151,7 +1339,7 @@ static int sdram_run_qualification(void)
 
     sequential_passed = sdram_run_test(
         SDRAM_FULL_TEST_BYTES,
-        "SDRAM destructive 1 MiB sequential test");
+        "SDRAM destructive diagnostic-window sequential test");
     sparse_passed = sdram_run_sparse_test();
     random_passed = sdram_run_random_test();
 
@@ -1607,7 +1795,19 @@ static void console_poll(void)
     uint8_t received;
 
     while (uart_getc_nonblocking(&received)) {
-        int sao_console_result = hazard3_sao_console_feed(received);
+        int sao_console_result;
+
+        if (received == SCREEN_SNIP_CAPABILITY_REQUEST) {
+            uart_putc(screen_snip_cache_valid()
+                ? SCREEN_SNIP_CAPABILITY_ACK : SCREEN_SNIP_CAPABILITY_NAK);
+            continue;
+        }
+        if (received == SCREEN_SNIP_REQUEST) {
+            screen_snip_send_cached();
+            continue;
+        }
+
+        sao_console_result = hazard3_sao_console_feed(received);
 
         if (sao_console_result == HAZARD3_SAO_CONSOLE_CONSUMED) {
             continue;
@@ -1623,19 +1823,18 @@ static void console_poll(void)
             console_print_prompt();
             break;
 
-        case 'h':
         case 'H':
+        case 'h':
         case '?':
             console_print_help();
             break;
-
         case 'm':
         case 'M':
             if (external_memory_require_ready(
-                "the destructive 1 MiB external-memory test")) {
+                "the destructive diagnostic-window external-memory test")) {
                 (void)sdram_run_test(
                     SDRAM_FULL_TEST_BYTES,
-                    "SDRAM destructive 1 MiB sequential test");
+                    "SDRAM destructive diagnostic-window sequential test");
             }
             uart_puts("> ");
             break;
@@ -1887,7 +2086,11 @@ static void console_init(void)
     uart_puts("\r\n");
     uart_puts("UART: board serial RX / TX, 115200 8N1\r\n");
     uart_puts("CPU: 50 MHz Hazard3, Timer: 10 ms machine interrupt\r\n");
-    uart_puts("Internal screen: 0x00010000-0x0001F9FF (320x200 indexed)\r\n");
+    if (HAZARD3_VIDEO_FPGA_BUILD_ID == HAZARD3_FPGA_BUILD_ID_ULX3S_12F) {
+        uart_puts("Doom screen: 0x20040000-0x2004F9FF external SDRAM (320x200 indexed)\r\n");
+    } else {
+        uart_puts("Internal screen: 0x00010000-0x0001F9FF (320x200 indexed)\r\n");
+    }
     uart_puts("Board LEDs: target-specific heartbeat and timer status\r\n");
     uart_puts("SDRAM profile: ");
     uart_puts(HAZARD3_SDRAM_PROFILE_NAME);
@@ -1910,7 +2113,11 @@ static void console_init(void)
     uart_puts(", video reserve at ");
     uart_put_hex32(HAZARD3_VIDEO_BASE);
     uart_puts("\r\n");
-    uart_puts("HDMI: 1024x600 full-panel scale, direct block-RAM double buffer\r\n");
+    if (HAZARD3_VIDEO_FPGA_BUILD_ID == HAZARD3_FPGA_BUILD_ID_ULX3S_12F) {
+        uart_puts("HDMI: 1024x600 full-panel scale, SDRAM + two-line EBR scanout\r\n");
+    } else {
+        uart_puts("HDMI: 1024x600 full-panel scale, direct block-RAM double buffer\r\n");
+    }
     uart_puts("Doom: l=UART image, w=UART IWAD, j=launch, b=SD boot\r\n");
 }
 
