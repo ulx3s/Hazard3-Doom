@@ -24,6 +24,7 @@ const H3D_OK_MARKER = "H3L OK";
 const H3D_ERROR_MARKER = "H3L ERROR";
 const H3D_RESPONSE_TIMEOUT_MS = 10_000;
 const H3D_RESULT_MARGIN_MS = 20_000;
+const CONSOLE_FIRMWARE_MAX_BYTES = 16 * 1024 * 1024;
 
 const state = {
     port: null,
@@ -46,6 +47,9 @@ const state = {
     screenSnipTransitionDeadline: 0,
     h3dImage: null,
     h3dWaiter: null,
+    consoleFirmware: null,
+    consoleFirmwareLoaderAvailable: false,
+    consoleFirmwareBusy: false,
     serialOperation: null,
     textDecoder: new TextDecoder(),
 };
@@ -81,6 +85,14 @@ const els = {
     h3dLaunchAfterUpload: document.getElementById("h3dLaunchAfterUpload"),
     h3dProgress: document.getElementById("h3dProgress"),
     h3dProgressLabel: document.getElementById("h3dProgressLabel"),
+    firmwareLoaderStatus: document.getElementById("firmwareLoaderStatus"),
+    firmwareFileInput: document.getElementById("firmwareFileInput"),
+    firmwareFileName: document.getElementById("firmwareFileName"),
+    firmwareFileDetails: document.getElementById("firmwareFileDetails"),
+    firmwareUploadButton: document.getElementById("firmwareUploadButton"),
+    firmwareProgress: document.getElementById("firmwareProgress"),
+    firmwareProgressLabel: document.getElementById("firmwareProgressLabel"),
+    firmwareLog: document.getElementById("firmwareLog"),
     clearButton: document.getElementById("clearButton"),
     rxCount: document.getElementById("rxCount"),
     txCount: document.getElementById("txCount"),
@@ -97,6 +109,9 @@ function screenSnipStatusText() {
     }
     if (state.screenSnip !== null) {
         return "Screen snip capture is in progress.";
+    }
+    if (state.consoleFirmwareBusy) {
+        return "Screen snip is paused while console firmware is loading.";
     }
     if (state.serialOperation === "h3d-upload") {
         return "Screen snip is paused while an H3D image is uploading.";
@@ -116,6 +131,7 @@ function screenSnipStatusText() {
 function updateScreenSnipUi() {
     const available = state.port &&
         state.serialOperation === null &&
+        !state.consoleFirmwareBusy &&
         state.screenSnipCapability === "available" &&
         state.screenSnip === null;
     const status = screenSnipStatusText();
@@ -124,6 +140,7 @@ function updateScreenSnipUi() {
     els.screenSnipButton.textContent = state.screenSnip !== null ? "Capturing..." : "Screen snip";
     els.screenSnipControl.title = status;
     els.screenSnipButton.setAttribute("aria-label", status);
+    updateConsoleFirmwareUi();
     updateH3dUploaderUi();
 }
 
@@ -267,6 +284,157 @@ function crc32(bytes) {
     return (crc ^ 0xffffffff) >>> 0;
 }
 
+function validateConsoleFirmware(bytes) {
+    if (bytes.byteLength < 52) {
+        throw new Error("file is shorter than a 32-bit ELF header");
+    }
+    if (bytes[0] !== 0x7f || bytes[1] !== 0x45 || bytes[2] !== 0x4c || bytes[3] !== 0x46) {
+        throw new Error("invalid ELF magic");
+    }
+    if (bytes[4] !== 1 || bytes[5] !== 1 || bytes[6] !== 1) {
+        throw new Error("expected a 32-bit little-endian ELF version 1");
+    }
+    if (bytes.byteLength > CONSOLE_FIRMWARE_MAX_BYTES) {
+        throw new Error("ELF exceeds the 16 MiB browser safety limit");
+    }
+
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (view.getUint16(16, true) !== 2) {
+        throw new Error("expected an executable ELF");
+    }
+    if (view.getUint16(18, true) !== 243) {
+        throw new Error("ELF machine is not RISC-V");
+    }
+    if (view.getUint32(20, true) !== 1) {
+        throw new Error("unsupported ELF version");
+    }
+
+    return {
+        bytes,
+        entryAddress: view.getUint32(24, true),
+    };
+}
+
+function updateConsoleFirmwareUi() {
+    const blocked = state.consoleFirmwareBusy ||
+        state.serialOperation !== null || state.screenSnip !== null;
+    const ready = state.consoleFirmwareLoaderAvailable &&
+        state.consoleFirmware !== null && !blocked;
+
+    els.firmwareFileInput.disabled = blocked;
+    els.firmwareUploadButton.disabled = !ready;
+    els.firmwareUploadButton.textContent = state.consoleFirmwareBusy
+        ? "Loading..."
+        : "Load console firmware";
+}
+
+function appendFirmwareLog(text) {
+    if (!text) {
+        return;
+    }
+    els.firmwareLog.textContent += text.endsWith("\n") ? text : `${text}\n`;
+    els.firmwareLog.scrollTop = els.firmwareLog.scrollHeight;
+}
+
+async function checkConsoleFirmwareLoader() {
+    try {
+        const response = await fetch("/api/console-firmware/status", { cache: "no-store" });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const status = await response.json();
+        state.consoleFirmwareLoaderAvailable = status.available === true;
+    } catch {
+        state.consoleFirmwareLoaderAvailable = false;
+    }
+
+    els.firmwareLoaderStatus.textContent = state.consoleFirmwareLoaderAvailable
+        ? "Ready"
+        : "Unavailable - run web-server.py";
+    els.firmwareLoaderStatus.classList.toggle("ok", state.consoleFirmwareLoaderAvailable);
+    els.firmwareLoaderStatus.classList.toggle("error", !state.consoleFirmwareLoaderAvailable);
+    els.firmwareProgressLabel.textContent = state.consoleFirmwareLoaderAvailable
+        ? "Idle"
+        : "Local firmware loader unavailable";
+    updateConsoleFirmwareUi();
+}
+
+async function selectConsoleFirmwareFile() {
+    state.consoleFirmware = null;
+    els.firmwareFileName.textContent = "No console firmware selected";
+    els.firmwareFileDetails.textContent = "";
+    els.firmwareProgress.value = 0;
+    els.firmwareProgressLabel.textContent = state.consoleFirmwareLoaderAvailable
+        ? "Idle"
+        : "Local firmware loader unavailable";
+    els.firmwareLog.textContent = "";
+
+    const file = els.firmwareFileInput.files?.[0];
+    if (!file) {
+        updateConsoleFirmwareUi();
+        return;
+    }
+
+    els.firmwareFileName.textContent = file.name;
+    els.firmwareFileDetails.textContent = "Validating RISC-V ELF...";
+    try {
+        const firmware = validateConsoleFirmware(new Uint8Array(await file.arrayBuffer()));
+        state.consoleFirmware = { ...firmware, fileName: file.name };
+        els.firmwareFileDetails.textContent =
+            `${firmware.bytes.byteLength.toLocaleString()} bytes | ` +
+            `RISC-V ELF32 | entry ${formatHex32(firmware.entryAddress)}`;
+    } catch (error) {
+        els.firmwareFileDetails.textContent = `Invalid console firmware: ${error.message}`;
+    }
+
+    updateConsoleFirmwareUi();
+}
+
+async function loadConsoleFirmware() {
+    const firmware = state.consoleFirmware;
+    if (!state.consoleFirmwareLoaderAvailable || !firmware ||
+        state.consoleFirmwareBusy || state.serialOperation !== null || state.screenSnip !== null) {
+        return;
+    }
+
+    state.consoleFirmwareBusy = true;
+    els.firmwareLog.textContent = "";
+    els.firmwareProgress.value = 25;
+    els.firmwareProgressLabel.textContent = "Sending ELF to local GDB loader...";
+    appendFirmwareLog(`Loading ${firmware.fileName} (${firmware.bytes.byteLength.toLocaleString()} bytes).`);
+    setConnectionUi(Boolean(state.port), state.port ? describePort(state.port) : "");
+
+    try {
+        const response = await fetch("/api/console-firmware/load", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/octet-stream",
+                "X-Hazard3-Doom-Local": "1",
+            },
+            body: firmware.bytes,
+        });
+        const result = await response.json();
+        appendFirmwareLog(result.output || "");
+        if (!response.ok || result.ok !== true) {
+            throw new Error(result.error || `local loader returned HTTP ${response.status}`);
+        }
+
+        els.firmwareProgress.value = 100;
+        els.firmwareProgressLabel.textContent = "Console firmware loaded and resumed";
+        appendFirmwareLog("Console firmware load completed successfully.");
+        if (state.port) {
+            beginScreenSnipTransitionProbe(1000);
+        }
+    } catch (error) {
+        els.firmwareProgress.value = 0;
+        els.firmwareProgressLabel.textContent = `Failed: ${error.message}`;
+        appendFirmwareLog(`ERROR: ${error.message}`);
+    } finally {
+        state.consoleFirmwareBusy = false;
+        setConnectionUi(Boolean(state.port), state.port ? describePort(state.port) : "");
+    }
+}
+
 function validateH3dPackage(bytes) {
     if (bytes.byteLength < H3D_HEADER_BYTES) {
         throw new Error("file is shorter than the 64-byte H3D header");
@@ -321,10 +489,11 @@ function validateH3dPackage(bytes) {
 function updateH3dUploaderUi() {
     const uploading = state.serialOperation === "h3d-upload";
     const ready = Boolean(state.port && state.h3dImage &&
-        state.serialOperation === null && state.screenSnip === null);
+        state.serialOperation === null && state.screenSnip === null &&
+        !state.consoleFirmwareBusy);
 
-    els.h3dFileInput.disabled = uploading;
-    els.h3dLaunchAfterUpload.disabled = uploading;
+    els.h3dFileInput.disabled = uploading || state.consoleFirmwareBusy;
+    els.h3dLaunchAfterUpload.disabled = uploading || state.consoleFirmwareBusy;
     els.h3dUploadButton.disabled = !ready;
     els.h3dUploadButton.textContent = uploading ? "Uploading..." : "Upload H3D";
 }
@@ -536,12 +705,14 @@ async function uploadH3dImage() {
 }
 
 function setConnectionUi(connected, detail = "") {
-    const interactive = connected && state.serialOperation === null;
+    const interactive = connected && state.serialOperation === null &&
+        !state.consoleFirmwareBusy;
 
     els.statusDot.classList.toggle("connected", connected);
     els.connectionStatus.textContent = connected ? "Connected" : "Not connected";
     els.connectButton.textContent = connected ? "Disconnect" : "Connect";
-    els.connectButton.disabled = state.serialOperation !== null;
+    els.connectButton.disabled = state.serialOperation !== null ||
+        state.consoleFirmwareBusy;
     els.commandInput.disabled = !interactive;
     els.sendButton.disabled = !interactive;
     els.macroSendButton.disabled = !interactive;
@@ -1337,6 +1508,8 @@ function wireEvents() {
     els.downloadButton.addEventListener("click", downloadLog);
     els.copyButton.addEventListener("click", copyTerminalContents);
     els.screenSnipButton.addEventListener("click", requestScreenSnip);
+    els.firmwareFileInput.addEventListener("change", selectConsoleFirmwareFile);
+    els.firmwareUploadButton.addEventListener("click", loadConsoleFirmware);
     els.h3dFileInput.addEventListener("change", selectH3dFile);
     els.h3dUploadButton.addEventListener("click", uploadH3dImage);
 
@@ -1416,6 +1589,8 @@ async function initialize() {
     loadSettings();
     wireEvents();
     setConnectionUi(false);
+    updateConsoleFirmwareUi();
+    void checkConsoleFirmwareLoader();
 
     if (!serialSupported) {
         els.unsupportedNotice.classList.remove("hidden");

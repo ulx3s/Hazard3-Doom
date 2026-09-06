@@ -15,6 +15,7 @@ Click "Update" and allow Windows to search for default drivers. Be sure to disco
 
 - Program ULX3S ECP5 FPGA SRAM from a `.bit` or `.svf` file through the board's US1 FT231X JTAG interface using WebUSB.
 - Probe and verify ECP5 12F/25F/45F/85F JTAG IDCODEs before programming.
+- Validate and load a 32-bit RISC-V console firmware ELF through the existing OpenOCD/GDB loader.
 - Connect/disconnect using the browser's serial-port picker.
 - Enumerate all serial ports already authorized for this site and select which one Reconnect opens.
 - Reconnect to the selected previously authorized port.
@@ -40,29 +41,30 @@ Click "Update" and allow Windows to search for default drivers. Be sure to disco
 - Send Enter, Ctrl-C, and a 150 ms serial break.
 - One-byte I2CDriver GUI controls for `S`, `P`, `R`, `W`, `X`, `1`, `4`, `H`, `C`, and `Q` without appending a line ending.
 - One saved custom command macro.
-- No JavaScript packages, framework, build system, backend, or cloud service required.
+- No JavaScript packages, framework, build system, or cloud service required; the console firmware control uses the local `web-server.py` helper.
 
 ## Run locally
 
 Web Serial and WebUSB require a secure context. `localhost` is suitable for local development.
 
-From this directory:
+From this directory, use the project server to enable the console firmware loader:
+
+```bash
+./web-server.py
+```
+
+Then open `http://localhost:8000/` in a browser that supports Web Serial.
+
+The static UART, H3D, and FPGA controls also work with a generic static server,
+but the console firmware loader will be unavailable:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Then open `http://localhost:8000/` in a browser that supports Web Serial.
-
-On Windows, this also works from PowerShell if Python is installed:
-
-```powershell
-py -m http.server 8000
-```
-
 ## GitHub Pages
 
-The files can be served unchanged by GitHub Pages. HTTPS satisfies the secure-context requirement for Web Serial and WebUSB.
+The files can be served unchanged by GitHub Pages. HTTPS satisfies the secure-context requirement for Web Serial and WebUSB. The console firmware control is disabled on GitHub Pages because a public static site cannot invoke the user's local GDB/OpenOCD tools.
 
 A convenient repository layout is:
 
@@ -74,7 +76,39 @@ docs/
         styles.css
 ```
 
-The app does not send UART or FPGA programming data to a server. JavaScript communicates directly with the devices selected in the browser permission dialogs.
+The app does not send UART or FPGA programming data to a server. JavaScript communicates directly with the devices selected in the browser permission dialogs. When served by `web-server.py`, a selected console firmware ELF is sent only to the loopback server, written to a temporary file, loaded by the repository's `scripts/load-firmware.sh`, and then deleted.
+
+## Console firmware uploader
+
+The collapsible **Console firmware uploader** sits between the FPGA flasher and
+the Doom H3D uploader. It accepts `hazard3-boot-monitor.elf`, validates that the
+file is a 32-bit little-endian RISC-V executable, and passes it to the existing
+GDB loader. The local server listens only on `127.0.0.1`, limits the ELF to
+16 MiB, requires a same-origin custom request header, and deletes the temporary
+copy after the loader exits.
+
+The firmware does not need to listen for its own replacement. OpenOCD talks to
+the Hazard3 debug module; GDB halts the processor, writes the ELF loadable
+sections, runs `compare-sections`, sets the PC to `_start`, resumes the core,
+and disconnects. Start OpenOCD before pressing **Load console firmware**. For
+the ULX3S 12F flow from the repository root:
+
+```bash
+./bin/openocd.exe -d2 \
+    -f ./third_party/Hazard3/example_soc/ulx3s-12f-openocd.cfg
+```
+
+Then run `web/web-server.py`, select the matching ELF, and load it. Do not keep
+the browser FPGA flasher connected to US1 while OpenOCD owns that interface.
+An already-running GDB session may also own port 3333; exit it before using the
+web loader.
+
+By default the local server invokes `../scripts/load-firmware.sh`. Override the
+loader only when testing another checkout:
+
+```bash
+./web-server.py --firmware-loader ../scripts/load-firmware-12f.sh
+```
 
 ## Doom H3D UART uploader
 

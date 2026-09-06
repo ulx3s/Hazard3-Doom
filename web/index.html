@@ -177,6 +177,54 @@
                 </div>
             </details>
 
+            <details id="consoleFirmwareUploader" class="flasher-section">
+                <summary>Console firmware uploader <span class="summary-tag">Local GDB / OpenOCD</span></summary>
+                <div class="flasher-body">
+                    <div class="flasher-intro">
+                        <div>
+                            <h3>Load the Hazard3 console firmware</h3>
+                            <p>Select <code>hazard3-boot-monitor.elf</code>. The local web server passes the ELF to the existing GDB loader, which halts Hazard3 through OpenOCD, writes and verifies the ELF sections, sets <code>_start</code>, and resumes the core.</p>
+                        </div>
+                        <div class="flasher-state">
+                            <span>Local loader</span>
+                            <strong id="firmwareLoaderStatus">Checking...</strong>
+                            <span>OpenOCD</span>
+                            <strong>Must already listen on port 3333</strong>
+                        </div>
+                    </div>
+
+                    <div class="flasher-grid">
+                        <label class="svf-picker">
+                            <span>Hazard3 console firmware (.elf)</span>
+                            <input id="firmwareFileInput" type="file" accept=".elf,application/x-elf,application/octet-stream">
+                            <strong id="firmwareFileName">No console firmware selected</strong>
+                            <small id="firmwareFileDetails"></small>
+                        </label>
+
+                        <div class="flasher-checklist">
+                            <strong>Load flow</strong>
+                            <span>1. Program the matching FPGA bitstream.</span>
+                            <span>2. Disconnect the browser FPGA flasher from US1.</span>
+                            <span>3. Start OpenOCD with the matching board configuration.</span>
+                            <span>4. Select the RISC-V ELF and load it.</span>
+                        </div>
+                    </div>
+
+                    <div class="flasher-actions">
+                        <button id="firmwareUploadButton" type="button" class="primary" disabled>Load console firmware</button>
+                    </div>
+
+                    <div class="flasher-progress-row">
+                        <progress id="firmwareProgress" max="100" value="0"></progress>
+                        <span id="firmwareProgressLabel">Checking local loader...</span>
+                    </div>
+
+                    <pre id="firmwareLog" class="flasher-log" tabindex="0" aria-live="polite" aria-label="Console firmware loader log"></pre>
+
+                    <p class="flasher-note"><strong>The firmware does not need a self-replacement listener for this path.</strong> OpenOCD and GDB load it through the Hazard3 debug module. This control is available only when the page is served by <code>web/web-server.py</code>, not from GitHub Pages or a generic static HTTP server.</p>
+                </div>
+            </details>
+
             <details id="h3dUploader" class="flasher-section">
                 <summary>Doom H3D uploader <span class="summary-tag">UART / H3L</span></summary>
                 <div class="flasher-body">
@@ -327,10 +375,10 @@
 
     <footer class="app-footer">
         <span>Hazard3-Doom Web controller</span>
-        <span>UART and FPGA programming data stay between this browser and the selected devices.</span>
+        <span>UART and FPGA programming data stay between this browser and the selected devices; console firmware uses the local loader.</span>
     </footer>
 
-    <script src="app.js?v=20260822-r7" defer></script>
+    <script src="app.js?v=20260826-r8" defer></script>
     <script src="flasher.js?v=20260821-r1" defer></script>
 </body>
 </html>
