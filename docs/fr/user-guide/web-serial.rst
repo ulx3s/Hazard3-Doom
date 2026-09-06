@@ -6,6 +6,9 @@ répertoire ``web/``. Elle utilise l'API Web Serial du navigateur pour
 communiquer directement avec l'UART de la carte et peut également demander une
 capture d'écran aux applications HDMI prises en charge.
 
+Pour le flux complet de l'outil web, y compris les téléversements H3D/IWAD
+et le chargement du firmware console, voir :doc:`web-tool`.
+
 La même application web contient aussi un programmateur FPGA WebUSB distinct
 pour l'interface JTAG FT231X ``US1`` de l'ULX3S. Web Serial et WebUSB sont des
 transports indépendants : la console UART reste sur son adaptateur série tandis

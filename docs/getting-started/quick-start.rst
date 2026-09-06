@@ -63,17 +63,28 @@ installation, see :doc:`programming` and :doc:`../user-guide/sd-card`.
 4. Load Doom over UART
 ----------------------
 
-Close any terminal program that already owns the UART port, then upload the Doom image:
+The browser device tool can perform both Doom transfers without leaving the web
+console. Expand **Serial connection**, connect the board UART, and confirm the
+resident monitor ``>`` prompt is active. Then expand **Device uploading**:
+
+#. Open **Doom H3D uploader**, select
+   ``build/ulx3s/doom-image/hazard3-doom.h3d``, and choose **Upload H3D**.
+#. Open **Doom IWAD uploader**, select a legally obtained ``.wad`` file, choose
+   the memory profile matching the resident monitor, and choose **Upload IWAD**.
+#. Select **Launch with ``j`` after upload** on the IWAD uploader if Doom should
+   start immediately after the monitor accepts the IWAD.
+
+For the complete browser workflow and memory-profile table, see
+:doc:`../user-guide/web-tool`.
+
+The command-line uploaders remain available when preferred. Close any terminal
+or browser connection that owns the UART port first, then run:
 
 .. code-block:: powershell
 
    py .\doom\upload-doom-image.py `
        .\build\doom-image\hazard3-doom.h3d `
        --port COM7
-
-Then upload a legally obtained IWAD:
-
-.. code-block:: powershell
 
    py .\doom\upload-wad.py `
        C:\path\to\DOOM.WAD `

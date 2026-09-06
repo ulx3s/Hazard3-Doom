@@ -58,7 +58,8 @@ Commencer ici
 * :doc:`getting-started/tiny-tapeout-ulx3s` - construire des projets Tiny Tapeout pour le FPGA ECP5 ULX3S localement ou avec GitHub Actions.
 * :doc:`hardware/ulx4m/index` - explorer le matériel ULX4M : FPGA, horloges, SDR/DDR3, flash, vidéo, SD, SerDes, contraintes de broches et révisions.
 * :doc:`reference/timing-sweeps` - exécuter les sweeps ECP5 localement/GitHub et interpréter le timing en direct.
-* :doc:`user-guide/web-flasher` - programmer la SRAM du FPGA ULX3S directement depuis Chrome/Edge avec WebUSB.
+* :doc:`user-guide/web-tool` - utiliser l'outil web pour l'UART, la programmation FPGA, le firmware console, H3D/IWAD et la capture d'écran.
+* :doc:`user-guide/web-flasher` - guide détaillé de programmation de la SRAM FPGA ULX3S avec WebUSB.
 * :doc:`user-guide/sd-card` - configurer un démarrage autonome à froid depuis une carte micro-SD.
 * :doc:`user-guide/i2cdriver` - analyser et inspecter le bus I2C SAO sur HDMI.
 * :doc:`user-guide/jtag-debugging` - déboguer Hazard3 avec OpenOCD/GDB ou VisualGDB.

@@ -1,8 +1,8 @@
-# Hazard3-Doom Web Console
+# Hazard3-Doom Web Device Tool
 
 Try it live at [ulx3s.github.io/Hazard3-Doom](https://ulx3s.github.io/Hazard3-Doom/)
 
-A dependency-free static web app for the Hazard3-Doom UART console, H3D image and IWAD loading, and ULX3S FPGA programming from a Chromium-based browser using Web Serial and WebUSB.
+A dependency-free browser device tool for the Hazard3-Doom UART console, H3D and IWAD loading, ULX3S FPGA SRAM programming, HDMI screen snip, and optional local GDB/OpenOCD console-firmware loading. Web Serial and WebUSB device operations run directly in a Chromium-based browser; the console-firmware uploader uses the local `web-server.py` helper.
 
 Windows users need to change drivers from default **FTDI** to **WinUSB** to use the WebUSB programmer.
 
@@ -24,7 +24,7 @@ Click "Update" and allow Windows to search for default drivers. Be sure to disco
 - Validate and upload packaged `.h3d` Doom images over UART using the monitor H3L handshake, with optional launch after upload.
 - Validate and upload legal `.wad` IWAD files over UART using the monitor H3W handshake, with 64 MiB/32 MiB memory-profile selection and optional launch after upload.
 - Configurable baud rate, data bits, parity, stop bits, and line ending, with all six serial controls kept on one desktop row.
-- Collapsible Serial connection panel containing the connection settings and upload/programming tools.
+- Separate collapsible **Device uploading** and **Serial connection** panels; the four upload/programming workflows are individually collapsible inside **Device uploading**.
 - Live UART receive terminal with a bounded 1,000,000-character scrollback buffer.
 - Command entry with Up/Down command history.
 - RX/TX byte counters and session timer.
