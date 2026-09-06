@@ -107,7 +107,7 @@ Commencer ici
 Liens du projet
 ---------------
 
-* `Dépôt Hazard3-Doom <https://github.com/gojimmypi/Hazard3-Doom>`_
+* `Dépôt Hazard3-Doom <https://github.com/ulx3s/Hazard3-Doom>`_
 * `Fork matériel Hazard3 pour ULX3S <https://github.com/ulx3s/Hazard3>`_
 * `Projet Hazard3 amont <https://github.com/Wren6991/Hazard3>`_
 * `Projet DoomGeneric amont <https://github.com/ozkl/doomgeneric>`_

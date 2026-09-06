@@ -16,12 +16,7 @@ branches of these ULX3S-maintained forks:
 * `ulx3s/tt-support-tools <https://github.com/ulx3s/tt-support-tools/tree/experimental>`_
   contains the Python FPGA build tool, ULX3S wrapper, and ULX3S LPF constraints.
 
-The working Hazard3-Doom workflow is currently staged on the ``sweep1`` branch.
-It is being used as the reference workflow for the ULX3S-maintained integration
-and is expected to move upstream with that integration once the interface is
-settled:
-
-* `tt-fpga-ulx.yaml <https://github.com/gojimmypi/Hazard3-Doom/blob/sweep1/.github/workflows/tt-fpga-ulx.yaml>`_
+* `tt-fpga-ulx.yaml <https://github.com/ulx3s/Hazard3-Doom/blob/main/.github/workflows/tt-fpga-ulx.yaml>`_
 
 .. admonition:: Experimental branch status
    :class: important
@@ -361,5 +356,5 @@ Related links
 
 * `ULX3S tt-gds-action experimental branch <https://github.com/ulx3s/tt-gds-action/tree/experimental>`_
 * `ULX3S tt-support-tools experimental branch <https://github.com/ulx3s/tt-support-tools/tree/experimental>`_
-* `Hazard3-Doom ULX3S TT workflow <https://github.com/gojimmypi/Hazard3-Doom/blob/sweep1/.github/workflows/tt-fpga-ulx.yaml>`_
+* `Hazard3-Doom ULX3S TT workflow <https://github.com/ulx3s/Hazard3-Doom/blob/main/.github/workflows/tt-fpga-ulx.yaml>`_
 * `ULX3S Tiny Tapeout template <https://github.com/ulx3s/ttsky-verilog-template/tree/ulx3s>`_

@@ -17,12 +17,7 @@ ovih forkova koje održava ULX3S projekt:
 * `ulx3s/tt-support-tools <https://github.com/ulx3s/tt-support-tools/tree/experimental>`_
   sadrži Python alat za FPGA build, ULX3S wrapper i ULX3S LPF ograničenja.
 
-Radni Hazard3-Doom workflow trenutačno je pripremljen na grani ``sweep1``. On
-se koristi kao referentni workflow za integraciju koju održava ULX3S i očekuje
-se da će biti prenesen upstream zajedno s tom integracijom kada se sučelje
-stabilizira:
-
-* `tt-fpga-ulx.yaml <https://github.com/gojimmypi/Hazard3-Doom/blob/sweep1/.github/workflows/tt-fpga-ulx.yaml>`_
+* `tt-fpga-ulx.yaml <https://github.com/ulx3s/Hazard3-Doom/blob/main/.github/workflows/tt-fpga-ulx.yaml>`_
 
 .. admonition:: Status eksperimentalne grane
    :class: important
@@ -365,5 +360,5 @@ Povezane poveznice
 
 * `ULX3S tt-gds-action experimental grana <https://github.com/ulx3s/tt-gds-action/tree/experimental>`_
 * `ULX3S tt-support-tools experimental grana <https://github.com/ulx3s/tt-support-tools/tree/experimental>`_
-* `Hazard3-Doom ULX3S TT workflow <https://github.com/gojimmypi/Hazard3-Doom/blob/sweep1/.github/workflows/tt-fpga-ulx.yaml>`_
+* `Hazard3-Doom ULX3S TT workflow <https://github.com/ulx3s/Hazard3-Doom/blob/main/.github/workflows/tt-fpga-ulx.yaml>`_
 * `ULX3S Tiny Tapeout predložak <https://github.com/ulx3s/ttsky-verilog-template/tree/ulx3s>`_

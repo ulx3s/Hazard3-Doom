@@ -78,9 +78,9 @@ html_theme_options = {
 
 html_context = {
     "display_github": True,
-    "github_user": "gojimmypi",
+    "github_user": "ulx3s",
     "github_repo": "Hazard3-Doom",
-    "github_version": os.environ.get("READTHEDOCS_GIT_IDENTIFIER", "develop"),
+    "github_version": os.environ.get("READTHEDOCS_GIT_IDENTIFIER", "main"),
     "conf_py_path": (
         f"/docs/{translation_language}/" if translation_name is not None else "/docs/"
     ),

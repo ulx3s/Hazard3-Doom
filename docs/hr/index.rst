@@ -106,7 +106,7 @@ Počnite ovdje
 Poveznice projekta
 ------------------
 
-* `Hazard3-Doom repozitorij <https://github.com/gojimmypi/Hazard3-Doom>`_
+* `Hazard3-Doom repozitorij <https://github.com/ulx3s/Hazard3-Doom>`_
 * `ULX3S Hazard3 hardverski fork <https://github.com/ulx3s/Hazard3>`_
 * `Izvorni Hazard3 projekt <https://github.com/Wren6991/Hazard3>`_
 * `Izvorni DoomGeneric projekt <https://github.com/ozkl/doomgeneric>`_
