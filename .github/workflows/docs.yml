@@ -12,6 +12,10 @@ on:
       - "docs/**"
       - ".github/workflows/docs.yml"
 
+permissions:
+  # explicit least-privilege setting for GITHUB_TOKEN, no write permissions needed
+  contents: read
+
 jobs:
   sphinx:
     runs-on: ubuntu-24.04

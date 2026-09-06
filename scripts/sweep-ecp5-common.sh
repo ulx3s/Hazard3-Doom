@@ -39,6 +39,32 @@ sweep_ecp5_require_file()
     }
 }
 
+sweep_ecp5_run_synthesis()
+{
+    local synth_dir="$1"
+    local synth_log="$2"
+    local status
+
+    shift 2
+    SWEEP_SYNTHESIS_RAN=0
+    rm -f "${synth_dir}/synth.log"
+    if make -C "${synth_dir}" "$@"; then
+        status=0
+    else
+        status=$?
+    fi
+
+    if [[ -f "${synth_dir}/synth.log" ]]; then
+        mv -f "${synth_dir}/synth.log" "${synth_log}"
+        # Output variable read by the board-specific script sourcing this file.
+        # Do not export.
+        # shellcheck disable=SC2034
+        SWEEP_SYNTHESIS_RAN=1
+    fi
+
+    return "${status}"
+}
+
 sweep_ecp5_bool()
 {
     local value="$1"

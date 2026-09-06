@@ -65,7 +65,7 @@ Windows users can start OpenOCD using the VisualGDB script:
 Load the Hazard3 firmware and start a GDB debugging session (required OpenOCD to be already running):
 
 ```DOS
-./bin/load_firmware.bat
+.\scripts\load-firmware.bat
 ```
 
 ## Runtime notes

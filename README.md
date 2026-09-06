@@ -14,6 +14,8 @@ and consumed as a pinned submodule under `third_party/Hazard3`. The Doom applica
 
 See the Quick Start and overview: https://ulx3s.github.io/ulx-doom/
 
+Full details: https://hazard3-doom.readthedocs.io/
+
 ## Objective
 
 Hazard3-Doom is an educational and experimental FPGA/RISC-V project.
@@ -137,11 +139,22 @@ Alliance `AS4C256M16D3` population without changing the `ahb_litedram.v` AHB
 bridge interface. Hazard3-Doom intentionally exposes only the 64 MiB software
 map even when the physical DDR device is larger.
 
-Current release validation uses seed 55 for ULX3S 85F and seed 65 for ULX3S
-12F. ULX4M-LD now has a timing-passing and hardware-qualified 40/60 MHz
-checkpoint: frozen-netlist seed 2 with HeAP timingweight 30, critexp 3, and
-timing-driven rip-up. The Micron-populated board passed the complete DDR
-qualification, heap stress, Doom smoke, and RV32-from-DDR execution tests. See
+Regenerate both SERV and VexRisc cores for the fitted device by passing its
+physical part number to
+`third_party/Hazard3/example_soc/third_party/LiteDRAM/regenerate-ulx4m.sh`.
+The editable LiteDRAM inputs are the checked-in YAML files beneath that
+directory's `configs/` tree.
+
+The current build defaults are:
+
+ - ULX3S 85F seed 82 
+ - ULX3S 12F seed 11
+ - ULX4M-LD seed 83, HeAP, timingweight 30
+
+The checked-in sweep summaries record the current timing results. The frozen ULX4M-LD seed-2
+checkpoint is also hardware-qualified on the Micron-populated board, including
+the complete DDR qualification, heap stress, Doom smoke, and RV32-from-DDR
+execution tests. See
 `docs/reference/board-profiles.rst` and `docs/reference/timing-sweeps.rst` for
 the exact hashes and qualification caveats.
 
@@ -164,8 +177,8 @@ because they build the FPGA, the application monitor, and the Doom image as one
 application release. The board Makefiles remain in Hazard3 because they build
 reusable hardware targets without owning the Doom application.
 
-See `docs/Hazard3-upstream-pr.md` for the proposed hardware-only upstream branch
-and PR split.
+See `docs/architecture/repositories.rst` for repository ownership and upstream
+boundaries.
 
 ## Build complete board targets
 
@@ -181,19 +194,18 @@ ULX3S 12F:
 ./scripts/build-ulx3s-12f-doom.sh
 ```
 
-ULX4M-LD 85F exploratory complete build:
+ULX4M-LD 85F:
 
 ```bash
-ALLOW_TIMING_FAILURE=1 ./scripts/build-ulx4m-ld-doom.sh
+./scripts/build-ulx4m-ld-doom.sh
 ```
 
-The normal complete-build route still uses the board build flow rather than the
-known-good sweep tuning, so this command is **not** the hardware-qualified
-seed-2 route. Use the timing sweep with HeAP timingweight 30, critexp 3, and
-timing-driven rip-up to select a timing-passing ULX4M-LD image. A complete
-rebuild can also change the synthesized netlist when the resident monitor or
-generated LiteDRAM profile changes, so rerun timing and DDR qualification for
-the new netlist. `ALLOW_TIMING_FAILURE=1` is exploratory only.
+The normal complete-build route uses seed `83` with `HeAP timingweight 30` and must
+close every required clock. A complete rebuild can change the synthesized
+netlist when the resident monitor or generated LiteDRAM profile changes, so
+rerun timing and DDR qualification for a release artifact rather than assuming
+that a seed remains valid. `ALLOW_TIMING_FAILURE=1` is reserved for explicit
+ULX4M-LD sweep experiments and must not be used for a release build.
 
 The wrappers build the FPGA in the pinned Hazard3 submodule, then copy the final
 bitstream into this repository:
@@ -202,9 +214,21 @@ bitstream into this repository:
 build/fpga_ulx3s.bit
 build/fpga_ulx3s_12f.bit
 build/fpga_ulx4m_ld.bit
-build/hazard3-boot-monitor.elf
-build/doom-image/hazard3-doom.h3d
+build/ulx3s/monitor/hazard3-boot-monitor.elf
+build/ulx3s/doom-image/hazard3-doom.h3d
+build/ulx3s/hazard3-boot-monitor.hex
+build/ulx3s-12f/monitor/hazard3-boot-monitor.elf
+build/ulx3s-12f/doom-image/hazard3-doom.h3d
+build/ulx3s-12f/hazard3-12f-bootstrap.hex
+build/ulx4m-ld/monitor/hazard3-boot-monitor.elf
+build/ulx4m-ld/doom-image/hazard3-doom.h3d
+build/ulx4m-ld/hazard3-boot-monitor.hex
 ```
+
+Synthesis and routing still use an ignored working preload below the Hazard3
+checkout because the upstream RTL refers to that location. The complete 85F
+wrappers copy the usable preload into their board directory under `build/`;
+tracked files in the submodule are not edited.
 
 Set `HAZARD3_ROOT` to test another Hazard3 checkout without changing the
 submodule pointer:
@@ -459,18 +483,19 @@ The target ELF is `build/hazard3-boot-monitor.elf`. The GDB startup helper is
 
 ## Tiny Tapeout
 
-These files are includes only for testing the Tiny Tapeout workflows:
+These files are included only for testing the Tiny Tapeout workflows:
 
-- `info.yml`
+- `info.yaml`
 - `src/config.json`
 - `src/project.v`
  
 ## Licensing and WAD files
 
 DoomGeneric is licensed under GPL-2.0 and is included as a pinned submodule.
-Hazard3 is licensed under Apache-2.0 and is included as a pinned submodule. The
-original Hazard3-Doom files should receive an explicit project license before
-public release.
+Hazard3 is licensed under Apache-2.0 and is included as a pinned submodule.
+Original Hazard3-Doom files use the license identified by their SPDX headers;
+see `LICENSING.md` for project policy and `LICENSES/` for complete texts and
+third-party notices.
 
 Do not commit or redistribute commercial Doom IWAD files. Obtain an IWAD
 legally and keep it outside Git or under the ignored `wads/` directory.
@@ -485,4 +510,4 @@ legally and keep it outside Git or under the ignored `wads/` directory.
 
 ### Email
 
-- [ulx3s.fpga@gmail.com](ulx3s.fpga@gmail.com) (If you do not use chats)
+- [ulx3s.fpga@gmail.com](mailto:ulx3s.fpga@gmail.com) (If you do not use chats)

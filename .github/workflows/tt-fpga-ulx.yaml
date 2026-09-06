@@ -15,6 +15,10 @@ on:
     # branches: none
   workflow_dispatch:
 
+permissions:
+  # explicit least-privilege setting for GITHUB_TOKEN, no write permissions needed
+  contents: read
+
 jobs:
   fpga-ice40:
     runs-on: ubuntu-24.04

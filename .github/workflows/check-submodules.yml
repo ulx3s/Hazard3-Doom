@@ -3,8 +3,6 @@ name: Check submodules
 on:
   pull_request:
   push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       enforce_ulx3s_forks:
@@ -14,6 +12,7 @@ on:
         type: boolean
 
 permissions:
+  # explicit least-privilege setting for GITHUB_TOKEN, no write permissions needed
   contents: read
 
 jobs:

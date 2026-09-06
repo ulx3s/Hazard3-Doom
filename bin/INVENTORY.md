@@ -12,7 +12,7 @@ Git source: current index (`git ls-files --cached`)
 
 Files inventoried: 26
 
-Total bytes: 39642930
+Total bytes: 39642934
 
 ## Verification
 
@@ -25,7 +25,7 @@ should be identified before a public release.
 
 | Path | Bytes | SHA-256 | Component | Kind |
 |---|---:|---|---|---|
-| `README.md` | 5669 | `cb2d16bb30fc9ca8de040c2a7446836a186800e8197d7bf3964ca8db4e0d5170` | REVIEW | Markdown documentation |
+| `README.md` | 5673 | `73957ac95a5b0a51f9edd0fd1efcd709f51ab4556c00ca26acc5691eeade09de` | REVIEW | Markdown documentation |
 | `dfu-prefix.exe` | 178765 | `96f1d24e00d1772e2c2721e100d86da4f7489af82fef1481819705bd0636d42e` | REVIEW | Windows executable |
 | `dfu-suffix.exe` | 179276 | `22946fa4cea2fd1396d5716af43b40e89e0096245135ae8080a09309880e4f0c` | REVIEW | Windows executable |
 | `dfu-util-static.exe` | 799602 | `1f4687d0f11f0eede72d582fb5174537d5820de515862a8041ac9506b4a6fa1e` | REVIEW | Windows executable |

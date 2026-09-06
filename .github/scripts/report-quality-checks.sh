@@ -116,6 +116,12 @@ report_result \
     'Python syntax validation failed.'
 
 report_result \
+    'JavaScript syntax check' \
+    "${JAVASCRIPT_SYNTAX_OUTCOME:-skipped}" \
+    "${QUALITY_LOG_DIR}/javascript-syntax.log" \
+    'JavaScript syntax validation failed.'
+
+report_result \
     'Host-tool tests' \
     "${HOST_TOOL_TESTS_OUTCOME:-skipped}" \
     "${QUALITY_LOG_DIR}/host-tool-tests.log" \

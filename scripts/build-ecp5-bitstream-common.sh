@@ -36,7 +36,7 @@ set -euo pipefail
 #   "nextpnr-ecp5" -- Next Generation Place and Route (Version nextpnr-0.10-95-gddc6c8c8)
 ULX3S_85F_DEFAULT_NEXTPNR_SEED=11
 ULX3S_12F_DEFAULT_NEXTPNR_SEED=82
-ULX4M_LD_85F_DEFAULT_NEXTPNR_SEED=1
+ULX4M_LD_85F_DEFAULT_NEXTPNR_SEED=83
 ULX4M_LD_85F_DEFAULT_NEXTPNR_HEAP_TIMINGWEIGHT=30
 
 BOARD_ID="${1:-}"
@@ -50,6 +50,7 @@ BUILD_DIR="${REPO_ROOT}/build"
 ALLOW_TIMING_FAILURE="${ALLOW_TIMING_FAILURE:-0}"
 FORCE_BITSTREAM_REBUILD="${FORCE_BITSTREAM_REBUILD:-0}"
 SKIP_SYNTH="${SKIP_SYNTH:-0}"
+SYNTHESIS_RAN=0
 
 require_tool()
 {
@@ -71,10 +72,11 @@ require_file()
     }
 }
 
-copy_synth_log()
+move_synth_log()
 {
-    if [[ -f "${SYNTH_SOURCE_LOG}" ]]; then
-        cp "${SYNTH_SOURCE_LOG}" "${SYNTH_LOG}"
+    if [[ -f "${SYNTH_WORK_LOG}" ]]; then
+        mv -f "${SYNTH_WORK_LOG}" "${SYNTH_LOG}"
+        SYNTHESIS_RAN=1
     fi
 }
 
@@ -112,9 +114,7 @@ prepare_ulx3s_video_profile()
             "${CONFIG_OUTPUT}" \
             "${BITSTREAM_OUTPUT}" \
             "${SVF_OUTPUT}" \
-            "${HAZARD3_SYNTH}/${FPGA_NAME}.config" \
-            "${HAZARD3_SYNTH}/${FPGA_NAME}.bit" \
-            "${HAZARD3_SYNTH}/${FPGA_NAME}.svf"
+            "${SYNTH_LOG}"
     fi
 
     printf 'HDMI video profile: %s (extended modes=%s)\n' \
@@ -165,9 +165,7 @@ prepare_ulx3s_12f_profile()
             "${BITSTREAM_OUTPUT}" \
             "${SVF_OUTPUT}" \
             "${SEED_STAMP}" \
-            "${HAZARD3_SYNTH}/${FPGA_NAME}.config" \
-            "${HAZARD3_SYNTH}/${FPGA_NAME}.bit" \
-            "${HAZARD3_SYNTH}/${FPGA_NAME}.svf"
+            "${SYNTH_LOG}"
     fi
 
     printf 'ULX3S 12F profile: compact 320x200, %s SDRAM\n' \
@@ -217,9 +215,7 @@ prepare_ulx4m_clock_profile()
             "${BITSTREAM_OUTPUT}" \
             "${SVF_OUTPUT}" \
             "${SEED_STAMP}" \
-            "${HAZARD3_SYNTH}/${FPGA_NAME}.config" \
-            "${HAZARD3_SYNTH}/${FPGA_NAME}.bit" \
-            "${HAZARD3_SYNTH}/${FPGA_NAME}.svf"
+            "${SYNTH_LOG}"
     fi
 
     printf 'ULX4M-LD system clock: %s MHz\n' "${HAZARD3_ULX4M_SYS_CLK_MHZ}"
@@ -328,41 +324,48 @@ reuse_ulx4m_bitstream_if_allowed()
 
 run_synthesis()
 {
+    SYNTHESIS_RAN=0
+    rm -f "${SYNTH_WORK_LOG}"
+
     case "${BOARD_ID}" in
     ulx3s-85f)
         if ! make -C "${HAZARD3_SYNTH}" -f "${MAKEFILE}" \
+            CHIPNAME="${BUILD_DIR}/${FPGA_NAME}" \
             HAZARD3_HDMI_EXTENDED_MODES="${HAZARD3_HDMI_EXTENDED_MODES}" synth; then
-            copy_synth_log
+            move_synth_log
             exit 1
         fi
         ;;
     ulx3s-12f)
         if ! make -C "${HAZARD3_SYNTH}" -f "${MAKEFILE}" \
+            CHIPNAME="${BUILD_DIR}/${FPGA_NAME}" \
             HAZARD3_MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE}" \
             HAZARD3_HDMI_EXTENDED_MODES=0 synth; then
-            copy_synth_log
+            move_synth_log
             exit 1
         fi
         ;;
     ulx4m-ld-85f)
         if ! DEFINES="${DEFINES:+${DEFINES} }HAZARD3_ULX4M_SYS_CLK_MHZ=${HAZARD3_ULX4M_SYS_CLK_MHZ}" \
             make -C "${HAZARD3_SYNTH}" -f "${MAKEFILE}" \
+                CHIPNAME="${BUILD_DIR}/${FPGA_NAME}" \
                 ULX4M_LITEDRAM_CPU="${ULX4M_LITEDRAM_CPU}" synth; then
-            copy_synth_log
+            move_synth_log
             exit 1
         fi
         ;;
     *)
-        if ! make -C "${HAZARD3_SYNTH}" -f "${MAKEFILE}" synth; then
-            copy_synth_log
+        if ! make -C "${HAZARD3_SYNTH}" -f "${MAKEFILE}" \
+            CHIPNAME="${BUILD_DIR}/${FPGA_NAME}" synth; then
+            move_synth_log
             exit 1
         fi
         ;;
     esac
 
+    move_synth_log
     require_file "${NETLIST}"
-    require_file "${SYNTH_SOURCE_LOG}"
-    copy_synth_log
+    require_file "${SYNTH_LOG}"
 
     case "${BOARD_ID}" in
     ulx3s-85f)
@@ -373,6 +376,7 @@ run_synthesis()
         ;;
     ulx4m-ld-85f)
         printf '%s\n' "${HAZARD3_ULX4M_SYS_CLK_MHZ}" > "${SYNTH_PROFILE_STAMP}"
+        install -m 0644 "${LITEDRAM_CONFIG}" "${LITEDRAM_CONFIG_SNAPSHOT}"
         ;;
     esac
 }
@@ -514,7 +518,8 @@ ulx3s-85f)
     NEXTPNR_SEED="${NEXTPNR_SEED:-${ULX3S_85F_DEFAULT_NEXTPNR_SEED}}"
     PNR_DEVICE_ARGS=(--um5g-85k --package CABGA381)
     HAZARD3_HDMI_EXTENDED_MODES="${HAZARD3_HDMI_EXTENDED_MODES:-1}"
-    SYNTH_PROFILE_STAMP="${HAZARD3_SYNTH}/fpga_ulx3s.video-profile"
+    SYNTH_PROFILE_STAMP="${BUILD_DIR}/fpga_ulx3s.video-profile"
+    SYNTH_DURATION_STAMP="${BUILD_DIR}/fpga_ulx3s.synth-seconds"
     ;;
 ulx3s-12f)
     DISPLAY_NAME="ULX3S 12F"
@@ -525,7 +530,8 @@ ulx3s-12f)
     NEXTPNR_SEED="${NEXTPNR_SEED:-${ULX3S_12F_DEFAULT_NEXTPNR_SEED}}"
     PNR_DEVICE_ARGS=(--12k --speed 6 --package CABGA381)
     HAZARD3_MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE:-32m}"
-    SYNTH_PROFILE_STAMP="${HAZARD3_SYNTH}/fpga_ulx3s_12f.memory-profile"
+    SYNTH_PROFILE_STAMP="${BUILD_DIR}/fpga_ulx3s_12f.memory-profile"
+    SYNTH_DURATION_STAMP="${BUILD_DIR}/fpga_ulx3s_12f.synth-seconds"
     SEED_STAMP="${BUILD_DIR}/fpga_ulx3s_12f.seed"
     ;;
 ulx4m-ld-85f)
@@ -553,9 +559,12 @@ ulx4m-ld-85f)
         ;;
     esac
     LITEDRAM_GENERATED_DIR="${LITEDRAM_DIR}/generated-${ULX4M_LITEDRAM_CPU}"
+    LITEDRAM_CONFIG="${LITEDRAM_GENERATED_DIR}/litedram_ulx4m_cpu.yml"
+    LITEDRAM_CONFIG_SNAPSHOT="${BUILD_DIR}/fpga_ulx4m_ld.litedram-config.yml"
     HAZARD3_ULX4M_SYS_CLK_MHZ="${HAZARD3_ULX4M_SYS_CLK_MHZ:-40}"
-    SYNTH_PROFILE_STAMP="${HAZARD3_SYNTH}/fpga_ulx4m_ld.sys-clk-mhz"
-    LITEDRAM_CPU_STAMP="${HAZARD3_SYNTH}/fpga_ulx4m_ld.litedram-cpu"
+    SYNTH_PROFILE_STAMP="${BUILD_DIR}/fpga_ulx4m_ld.sys-clk-mhz"
+    SYNTH_DURATION_STAMP="${BUILD_DIR}/fpga_ulx4m_ld.synth-seconds"
+    LITEDRAM_CPU_STAMP="${BUILD_DIR}/fpga_ulx4m_ld.litedram-cpu"
     SEED_STAMP="${BUILD_DIR}/fpga_ulx4m_ld.seed"
     TIMINGWEIGHT_STAMP="${BUILD_DIR}/fpga_ulx4m_ld.heap-timingweight"
     ;;
@@ -566,13 +575,14 @@ ulx4m-ld-85f)
     ;;
 esac
 
-NETLIST="${HAZARD3_SYNTH}/${FPGA_NAME}.json"
-SYNTH_SOURCE_LOG="${HAZARD3_SYNTH}/synth.log"
+NETLIST="${BUILD_DIR}/${FPGA_NAME}.json"
+SYNTH_WORK_LOG="${HAZARD3_SYNTH}/synth.log"
 BITSTREAM_OUTPUT="${BUILD_DIR}/${FPGA_NAME}.bit"
 CONFIG_OUTPUT="${BUILD_DIR}/${FPGA_NAME}.config"
 SVF_OUTPUT="${BUILD_DIR}/${FPGA_NAME}.svf"
 PNR_LOG="${BUILD_DIR}/${FPGA_NAME}.pnr.log"
 SYNTH_LOG="${BUILD_DIR}/${FPGA_NAME}.synth.log"
+SYNTH_SOURCE_LOG="${SYNTH_LOG}"
 CONFIG_TEMP="${CONFIG_OUTPUT}.tmp.$$"
 BITSTREAM_TEMP="${BITSTREAM_OUTPUT}.tmp.$$"
 SVF_TEMP="${SVF_OUTPUT}.tmp.$$"
@@ -582,6 +592,10 @@ case "${ALLOW_TIMING_FAILURE}" in
     timing_options=()
     ;;
 1)
+    if [[ "${BOARD_ID}" != "ulx4m-ld-85f" ]]; then
+        echo "ALLOW_TIMING_FAILURE=1 is supported only for ULX4M-LD sweep experiments." >&2
+        exit 1
+    fi
     timing_options=(--timing-allow-fail)
     ;;
 *)
@@ -632,10 +646,12 @@ if [[ "${BOARD_ID}" == "ulx4m-ld-85f" ]]; then
     require_tool grep
     require_tool awk
     if [[ "${SKIP_SYNTH}" == 0 ]]; then
+        require_tool install
         require_file "${LITEDRAM_DIR}/litedram_ulx4m_cpu.v"
         require_file "${LITEDRAM_GENERATED_DIR}/litedram_ulx4m_cpu.v"
         require_file "${LITEDRAM_GENERATED_DIR}/litedram_ulx4m_cpu_rom.init"
         require_file "${LITEDRAM_GENERATED_DIR}/litedram_ulx4m_cpu_sram.init"
+        require_file "${LITEDRAM_CONFIG}"
     fi
 fi
 
@@ -660,7 +676,12 @@ fi
 if [[ "${SKIP_SYNTH}" == 1 ]]; then
     validate_ulx4m_frozen_netlist
 else
+    synth_start_seconds="$(date +%s)"
     run_synthesis
+    if [[ "${SYNTHESIS_RAN}" == 1 ]]; then
+        printf '%s\n' "$(( $(date +%s) - synth_start_seconds ))" \
+            > "${SYNTH_DURATION_STAMP}"
+    fi
 fi
 
 if [[ "${BOARD_ID}" == "ulx3s-12f" ]]; then
@@ -748,13 +769,6 @@ fi
 if [[ -n "${TIMINGWEIGHT_STAMP:-}" ]]; then
     printf '%s\n' "${NEXTPNR_HEAP_TIMINGWEIGHT}" > "${TIMINGWEIGHT_STAMP}"
 fi
-
-# Remove only obsolete integration P&R artifacts from the Hazard3 synth tree.
-rm -f \
-    "${HAZARD3_SYNTH}/${FPGA_NAME}.config" \
-    "${HAZARD3_SYNTH}/${FPGA_NAME}.bit" \
-    "${HAZARD3_SYNTH}/${FPGA_NAME}.svf" \
-    "${HAZARD3_SYNTH}/pnr.log"
 
 printf '%s bitstream: %s\n' "${DISPLAY_NAME}" "${BITSTREAM_OUTPUT}"
 if [[ -n "${SEED_STAMP:-}" ]]; then

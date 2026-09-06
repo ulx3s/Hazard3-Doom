@@ -2,6 +2,9 @@
 
 From: https://github.com/gojimmypi/Hazard3-Doom/actions/runs/33827152284/job/100892326473
 
+The paths recorded below are historical workflow metadata from that run.
+Current scripts keep netlists, logs, and sweep results under top-level `build/`.
+
 - Synthesis duration: 1:16 (76 seconds)
 - Seeds expected: 260
 - Routes completed: 260

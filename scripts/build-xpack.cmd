@@ -23,7 +23,7 @@ setlocal EnableExtensions
 rem Native Windows build for the Hazard3 resident monitor.
 rem
 rem Usage:
-rem   build-xpack.cmd [build^|clean^|rebuild] [64m^|32m] [50000000^|25000000]
+rem   build-xpack.cmd [build^|clean^|rebuild] [64m^|32m] [50000000^|40000000^|25000000]
 rem
 rem Defaults:
 rem   build 64m 50000000
@@ -60,7 +60,7 @@ if /i "%ACTION%"=="clean" goto :clean_only
 if /i "%ACTION%"=="rebuild" goto :rebuild
 
 echo ERROR: Unsupported action "%ACTION%".
-echo Usage: %~nx0 [build^|clean^|rebuild] [64m^|32m] [50000000^|25000000]
+echo Usage: %~nx0 [build^|clean^|rebuild] [64m^|32m] [50000000^|40000000^|25000000]
 exit /b 2
 
 :validate
@@ -77,10 +77,11 @@ exit /b 2
 
 :memory_ok
 if "%SYSTEM_CLOCK_HZ%"=="50000000" goto :clock_ok
+if "%SYSTEM_CLOCK_HZ%"=="40000000" goto :clock_ok
 if "%SYSTEM_CLOCK_HZ%"=="25000000" goto :clock_ok
 
 echo ERROR: Unsupported system clock "%SYSTEM_CLOCK_HZ%".
-echo Use 50000000 or 25000000.
+echo Use 50000000, 40000000 or 25000000.
 exit /b 2
 
 :clock_ok

@@ -30,9 +30,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 HAZARD3_ROOT="${HAZARD3_ROOT:-${REPO_ROOT}/third_party/Hazard3}"
 SYNTH_DIR="${HAZARD3_ROOT}/example_soc/synth"
+BUILD_DIR="${REPO_ROOT}/build"
 SWEEP_JOBS="${SWEEP_JOBS:-4}"
 HAZARD3_HDMI_EXTENDED_MODES="${HAZARD3_HDMI_EXTENDED_MODES:-1}"
-SYNTH_PROFILE_STAMP="${SYNTH_DIR}/fpga_ulx3s.video-profile"
+NETLIST="${BUILD_DIR}/fpga_ulx3s.json"
+SYNTH_LOG="${BUILD_DIR}/fpga_ulx3s.synth.log"
+SYNTH_PROFILE_STAMP="${BUILD_DIR}/fpga_ulx3s.video-profile"
 
 usage()
 {
@@ -78,7 +81,7 @@ case "${HAZARD3_HDMI_EXTENDED_MODES}" in
     ;;
 esac
 
-SWEEP_DIR="placement-sweep/${VIDEO_PROFILE}"
+SWEEP_DIR="${BUILD_DIR}/ulx3s-placement-sweep/${VIDEO_PROFILE}"
 
 if (( $# == 1 )); then
     seed_arg="$1"
@@ -101,6 +104,7 @@ require_tool make
 require_tool yosys
 require_tool nextpnr-ecp5
 require_tool sha256sum
+mkdir -p "${BUILD_DIR}"
 
 [[ -f "${SYNTH_DIR}/fpga_ulx3s.lpf" ]] || {
     echo "Missing ${SYNTH_DIR}/fpga_ulx3s.lpf" >&2
@@ -108,8 +112,8 @@ require_tool sha256sum
 }
 
 netlist_sha256_before=""
-if [[ -s "${SYNTH_DIR}/fpga_ulx3s.json" ]]; then
-    netlist_sha256_before="$(sha256sum "${SYNTH_DIR}/fpga_ulx3s.json" | awk '{print $1}')"
+if [[ -s "${NETLIST}" ]]; then
+    netlist_sha256_before="$(sha256sum "${NETLIST}" | awk '{print $1}')"
 fi
 
 current_video_profile=""
@@ -117,13 +121,13 @@ if [[ -f "${SYNTH_PROFILE_STAMP}" ]]; then
     read -r current_video_profile < "${SYNTH_PROFILE_STAMP}" || true
 fi
 
-if [[ ! -s "${SYNTH_DIR}/fpga_ulx3s.json" ||
+if [[ ! -s "${NETLIST}" ||
       "${current_video_profile}" != "${VIDEO_PROFILE}" ]]; then
     if [[ -n "${current_video_profile}" &&
           "${current_video_profile}" != "${VIDEO_PROFILE}" ]]; then
         printf 'HDMI video profile changed: %s -> %s\n' \
             "${current_video_profile}" "${VIDEO_PROFILE}"
-    elif [[ -s "${SYNTH_DIR}/fpga_ulx3s.json" ]]; then
+    elif [[ -s "${NETLIST}" ]]; then
         printf 'HDMI video profile is not recorded; rebuilding for %s mode.\n' \
             "${VIDEO_PROFILE}"
     else
@@ -132,10 +136,8 @@ if [[ ! -s "${SYNTH_DIR}/fpga_ulx3s.json" ||
     fi
 
     rm -f \
-        "${SYNTH_DIR}/fpga_ulx3s.json" \
-        "${SYNTH_DIR}/fpga_ulx3s.config" \
-        "${SYNTH_DIR}/fpga_ulx3s.bit" \
-        "${SYNTH_DIR}/fpga_ulx3s.svf"
+        "${NETLIST}" \
+        "${SYNTH_LOG}"
 fi
 
 printf 'HDMI video profile: %s (extended modes=%s)\n' \
@@ -143,27 +145,39 @@ printf 'HDMI video profile: %s (extended modes=%s)\n' \
 
 # Always ask make to ensure the synthesized netlist is current. This is a no-op
 # when the selected profile and source dependencies are already up to date.
-make -C "${SYNTH_DIR}" -f ULX3S.mk \
-    HAZARD3_HDMI_EXTENDED_MODES="${HAZARD3_HDMI_EXTENDED_MODES}" synth
+if make -C "${SYNTH_DIR}" -f ULX3S.mk \
+    CHIPNAME="${BUILD_DIR}/fpga_ulx3s" \
+    HAZARD3_HDMI_EXTENDED_MODES="${HAZARD3_HDMI_EXTENDED_MODES}" synth; then
+    synth_status=0
+else
+    synth_status=$?
+fi
+if [[ -f "${SYNTH_DIR}/synth.log" ]]; then
+    mv -f "${SYNTH_DIR}/synth.log" "${SYNTH_LOG}"
+fi
+(( synth_status == 0 )) || exit "${synth_status}"
 
-[[ -s "${SYNTH_DIR}/fpga_ulx3s.json" ]] || {
-    echo "Synthesis completed without creating ${SYNTH_DIR}/fpga_ulx3s.json" >&2
+[[ -s "${NETLIST}" ]] || {
+    echo "Synthesis completed without creating ${NETLIST}" >&2
+    exit 1
+}
+[[ -s "${SYNTH_LOG}" ]] || {
+    echo "Synthesis completed without creating ${SYNTH_LOG}" >&2
     exit 1
 }
 
 printf '%s\n' "${VIDEO_PROFILE}" > "${SYNTH_PROFILE_STAMP}"
 
-netlist_sha256="$(sha256sum "${SYNTH_DIR}/fpga_ulx3s.json" | awk '{print $1}')"
+netlist_sha256="$(sha256sum "${NETLIST}" | awk '{print $1}')"
 if [[ -n "${netlist_sha256_before}" &&
       "${netlist_sha256_before}" != "${netlist_sha256}" ]]; then
     printf 'Synthesized netlist changed; invalidating routed FPGA artifacts.\n'
     rm -f \
-        "${SYNTH_DIR}/fpga_ulx3s.config" \
-        "${SYNTH_DIR}/fpga_ulx3s.bit" \
-        "${SYNTH_DIR}/fpga_ulx3s.svf"
+        "${BUILD_DIR}/fpga_ulx3s.config" \
+        "${BUILD_DIR}/fpga_ulx3s.bit" \
+        "${BUILD_DIR}/fpga_ulx3s.svf"
 fi
 
-cd "${SYNTH_DIR}"
 mkdir -p "${SWEEP_DIR}"
 
 {
@@ -175,7 +189,7 @@ mkdir -p "${SWEEP_DIR}"
 } > "${SWEEP_DIR}/metadata.txt"
 
 printf 'Placement sweep netlist SHA256: %s\n' "${netlist_sha256}"
-printf 'Placement sweep directory: %s/%s\n' "${SYNTH_DIR}" "${SWEEP_DIR}"
+printf 'Placement sweep directory: %s\n' "${SWEEP_DIR}"
 
 extract_clock()
 {
@@ -209,8 +223,8 @@ run_seed()
         --placer heap \
         --um5g-85k \
         --package CABGA381 \
-        --lpf fpga_ulx3s.lpf \
-        --json fpga_ulx3s.json \
+        --lpf "${SYNTH_DIR}/fpga_ulx3s.lpf" \
+        --json "${NETLIST}" \
         --seed "${seed}" \
         --timing-allow-fail \
         --no-route \
@@ -271,6 +285,6 @@ done
 } > "${results_file}"
 
 echo
-echo "Results: ${SYNTH_DIR}/${results_file}"
+echo "Results: ${results_file}"
 
 exit "${status}"

@@ -117,13 +117,13 @@ case "$1" in
     target="$(canonical_target "$2")"
     case "${target}" in
     ulx3s-85f)
-        printf 'third_party/Hazard3/example_soc/synth/fpga_ulx3s.json\n'
+        printf 'build/fpga_ulx3s.json\n'
         ;;
     ulx3s-12f)
-        printf 'third_party/Hazard3/example_soc/synth/fpga_ulx3s_12f.json\n'
+        printf 'build/fpga_ulx3s_12f.json\n'
         ;;
     ulx4m-ld-85f)
-        printf 'third_party/Hazard3/example_soc/synth/fpga_ulx4m_ld.json\n'
+        printf 'build/fpga_ulx4m_ld.json\n'
         ;;
     esac
     exit 0

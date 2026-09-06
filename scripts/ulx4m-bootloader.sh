@@ -727,7 +727,7 @@ recover_install()
 
 program_user_bitstream()
 {
-    local default_user_bitstream="${REPO_ROOT}/third_party/Hazard3/example_soc/synth/fpga_ulx4m_ld.bit"
+    local default_user_bitstream="${REPO_ROOT}/build/fpga_ulx4m_ld.bit"
     local user_bitstream="${1:-${default_user_bitstream}}"
     local user_bitstream_abs
     local user_bitstream_win

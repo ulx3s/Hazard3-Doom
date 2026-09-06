@@ -24,18 +24,19 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 HAZARD3_ROOT="${HAZARD3_ROOT:-${REPO_ROOT}/third_party/Hazard3}"
 SYNTH_DIR="${HAZARD3_ROOT}/example_soc/synth"
+BUILD_DIR="${REPO_ROOT}/build"
 COMMON_SCRIPT="${SCRIPT_DIR}/sweep-ecp5-common.sh"
 SWEEP_JOBS="${SWEEP_JOBS:-4}"
 SWEEP_SKIP_SYNTH="${SWEEP_SKIP_SYNTH:-0}"
 SWEEP_PREPARE_ONLY="${SWEEP_PREPARE_ONLY:-0}"
 HAZARD3_MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE:-32m}"
 
-NETLIST="${SYNTH_DIR}/fpga_ulx3s_12f.json"
+NETLIST="${BUILD_DIR}/fpga_ulx3s_12f.json"
 LPF="${SYNTH_DIR}/fpga_ulx3s.lpf"
 MAKEFILE="${SYNTH_DIR}/ULX3S_12F.mk"
-SYNTH_LOG="${SYNTH_DIR}/synth.log"
-SYNTH_PROFILE_STAMP="${SYNTH_DIR}/fpga_ulx3s_12f.memory-profile"
-SYNTH_DURATION_STAMP="${SYNTH_DIR}/fpga_ulx3s_12f.synth-seconds"
+SYNTH_LOG="${BUILD_DIR}/fpga_ulx3s_12f.synth.log"
+SYNTH_PROFILE_STAMP="${BUILD_DIR}/fpga_ulx3s_12f.memory-profile"
+SYNTH_DURATION_STAMP="${BUILD_DIR}/fpga_ulx3s_12f.synth-seconds"
 
 # shellcheck source=scripts/sweep-ecp5-common.sh
 # shellcheck disable=SC1091
@@ -44,7 +45,7 @@ printf 'Include source: %s\n' "${COMMON_SCRIPT}" >&2
 
 sweep_ecp5_init_tuning
 TUNING_SUFFIX="$(sweep_ecp5_tuning_suffix)"
-SWEEP_DIR="${REPO_ROOT}/build/ulx3s-12f-seed-sweep/${HAZARD3_MEMORY_PROFILE}${TUNING_SUFFIX}"
+SWEEP_DIR="${BUILD_DIR}/ulx3s-12f-seed-sweep/${HAZARD3_MEMORY_PROFILE}${TUNING_SUFFIX}"
 SWEEP_REL_DIR="${SWEEP_DIR#"${REPO_ROOT}"/}"
 
 usage()
@@ -115,6 +116,7 @@ sweep_ecp5_require_tool awk
 sweep_ecp5_require_tool grep
 sweep_ecp5_require_tool sed
 sweep_ecp5_require_file "${LPF}"
+mkdir -p "${BUILD_DIR}"
 
 synthesis_seconds="NA"
 if [[ -f "${SYNTH_DURATION_STAMP}" ]]; then
@@ -148,9 +150,7 @@ else
     if [[ "${current_profile}" != "${HAZARD3_MEMORY_PROFILE}" ]]; then
         rm -f \
             "${NETLIST}" \
-            "${SYNTH_DIR}/fpga_ulx3s_12f.config" \
-            "${SYNTH_DIR}/fpga_ulx3s_12f.bit" \
-            "${SYNTH_DIR}/fpga_ulx3s_12f.svf" \
+            "${SYNTH_LOG}" \
             "${SYNTH_DURATION_STAMP}"
     fi
 
@@ -158,11 +158,18 @@ else
         "${HAZARD3_MEMORY_PROFILE}"
 
     synth_start_seconds="$(date +%s)"
-    make -C "${SYNTH_DIR}" -f ULX3S_12F.mk \
+    sweep_ecp5_run_synthesis "${SYNTH_DIR}" "${SYNTH_LOG}" \
+        -f ULX3S_12F.mk \
+        CHIPNAME="${BUILD_DIR}/fpga_ulx3s_12f" \
         HAZARD3_MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE}" \
         HAZARD3_HDMI_EXTENDED_MODES=0 synth
-    synthesis_seconds="$(( $(date +%s) - synth_start_seconds ))"
-    printf '%s\n' "${synthesis_seconds}" > "${SYNTH_DURATION_STAMP}"
+    if [[ "${SWEEP_SYNTHESIS_RAN}" == 1 ]]; then
+        synthesis_seconds="$(( $(date +%s) - synth_start_seconds ))"
+        printf '%s\n' "${synthesis_seconds}" > "${SYNTH_DURATION_STAMP}"
+    else
+        printf 'Synthesis reused the existing netlist; recorded duration remains %s.\n' \
+            "${synthesis_seconds}"
+    fi
     printf '%s\n' "${HAZARD3_MEMORY_PROFILE}" > "${SYNTH_PROFILE_STAMP}"
 fi
 

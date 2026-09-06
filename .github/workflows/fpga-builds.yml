@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  # explicit least-privilege setting for GITHUB_TOKEN, no write permissions needed
   contents: read
 
 concurrency:
@@ -35,10 +36,10 @@ jobs:
             board: ulx3s-85f
             command: ./scripts/build-ulx3s-doom.sh
             fpga_name: fpga_ulx3s
-            monitor_dir: build
-            doom_dir: build/doom-image
+            monitor_dir: build/ulx3s/monitor
+            doom_dir: build/ulx3s/doom-image
             seed_required: false
-            boot_init: third_party/Hazard3/example_soc/soc/hazard3-boot-monitor.hex
+            boot_init: build/ulx3s/hazard3-boot-monitor.hex
           - name: ULX3S 12F
             board: ulx3s-12f
             command: ./scripts/build-ulx3s-12f-doom.sh
@@ -46,15 +47,15 @@ jobs:
             monitor_dir: build/ulx3s-12f/monitor
             doom_dir: build/ulx3s-12f/doom-image
             seed_required: true
-            boot_init: third_party/Hazard3/example_soc/soc/hazard3-12f-bootstrap.hex
+            boot_init: build/ulx3s-12f/hazard3-12f-bootstrap.hex
           - name: ULX4M-LD 85F
             board: ulx4m-ld-85f
             command: ./scripts/build-ulx4m-ld-doom.sh
             fpga_name: fpga_ulx4m_ld
-            monitor_dir: build
-            doom_dir: build/doom-image
+            monitor_dir: build/ulx4m-ld/monitor
+            doom_dir: build/ulx4m-ld/doom-image
             seed_required: true
-            boot_init: third_party/Hazard3/example_soc/soc/hazard3-boot-monitor.hex
+            boot_init: build/ulx4m-ld/hazard3-boot-monitor.hex
 
     steps:
       - name: Check out repository
@@ -121,10 +122,10 @@ jobs:
       - name: Build FPGA, monitor, and Doom image
         env:
           FORCE_BITSTREAM_REBUILD: "1"
-          ALLOW_TIMING_FAILURE: "1"
+
         run: |
-          # Produce a fresh P&R result. Timing logs remain artifacts for review;
-          # known timing misses do not hide synthesis, packaging, or integration failures.
+          # Produce a fresh P&R result. All release board builds must close
+          # timing; exploratory timing-allow-fail runs belong in sweep jobs.
           ${{ matrix.command }}
 
           test -s "build/${{ matrix.fpga_name }}.bit"

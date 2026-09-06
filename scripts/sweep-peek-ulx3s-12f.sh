@@ -30,15 +30,16 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 HAZARD3_ROOT="${HAZARD3_ROOT:-${REPO_ROOT}/third_party/Hazard3}"
 SYNTH_DIR="${HAZARD3_ROOT}/example_soc/synth"
+BUILD_DIR="${REPO_ROOT}/build"
 SWEEP_JOBS="${SWEEP_JOBS:-4}"
 HAZARD3_MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE:-32m}"
 
-NETLIST="${SYNTH_DIR}/fpga_ulx3s_12f.json"
+NETLIST="${BUILD_DIR}/fpga_ulx3s_12f.json"
 LPF="${SYNTH_DIR}/fpga_ulx3s.lpf"
 MAKEFILE="${SYNTH_DIR}/ULX3S_12F.mk"
-SYNTH_LOG="${SYNTH_DIR}/synth.log"
-SYNTH_PROFILE_STAMP="${SYNTH_DIR}/fpga_ulx3s_12f.memory-profile"
-SWEEP_DIR="${REPO_ROOT}/build/ulx3s-12f-placement-sweep/${HAZARD3_MEMORY_PROFILE}"
+SYNTH_LOG="${BUILD_DIR}/fpga_ulx3s_12f.synth.log"
+SYNTH_PROFILE_STAMP="${BUILD_DIR}/fpga_ulx3s_12f.memory-profile"
+SWEEP_DIR="${BUILD_DIR}/ulx3s-12f-placement-sweep/${HAZARD3_MEMORY_PROFILE}"
 
 usage()
 {
@@ -220,9 +221,7 @@ if [[ "${current_profile}" != "${HAZARD3_MEMORY_PROFILE}" ]]; then
 
     rm -f \
         "${NETLIST}" \
-        "${SYNTH_DIR}/fpga_ulx3s_12f.config" \
-        "${SYNTH_DIR}/fpga_ulx3s_12f.bit" \
-        "${SYNTH_DIR}/fpga_ulx3s_12f.svf"
+        "${SYNTH_LOG}"
 fi
 
 netlist_sha256_before=""
@@ -235,9 +234,18 @@ printf 'ULX3S 12F profile: compact 320x200, %s SDRAM\n' \
 
 # Synthesize once before starting concurrent placement checks. This is a no-op
 # when the compact-profile synthesized netlist is already current.
-make -C "${SYNTH_DIR}" -f ULX3S_12F.mk \
+if make -C "${SYNTH_DIR}" -f ULX3S_12F.mk \
+    CHIPNAME="${BUILD_DIR}/fpga_ulx3s_12f" \
     HAZARD3_MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE}" \
-    HAZARD3_HDMI_EXTENDED_MODES=0 synth
+    HAZARD3_HDMI_EXTENDED_MODES=0 synth; then
+    synth_status=0
+else
+    synth_status=$?
+fi
+if [[ -f "${SYNTH_DIR}/synth.log" ]]; then
+    mv -f "${SYNTH_DIR}/synth.log" "${SYNTH_LOG}"
+fi
+(( synth_status == 0 )) || exit "${synth_status}"
 
 [[ -s "${NETLIST}" ]] || {
     echo "Synthesis completed without creating ${NETLIST}" >&2

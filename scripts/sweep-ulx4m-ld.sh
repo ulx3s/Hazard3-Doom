@@ -24,6 +24,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 HAZARD3_ROOT="${HAZARD3_ROOT:-${REPO_ROOT}/third_party/Hazard3}"
 SYNTH_DIR="${HAZARD3_ROOT}/example_soc/synth"
+BUILD_DIR="${REPO_ROOT}/build"
 LITEDRAM_DIR="${HAZARD3_ROOT}/example_soc/third_party/LiteDRAM"
 COMMON_SCRIPT="${SCRIPT_DIR}/sweep-ecp5-common.sh"
 SWEEP_JOBS="${SWEEP_JOBS:-2}"
@@ -31,12 +32,12 @@ SWEEP_SKIP_SYNTH="${SWEEP_SKIP_SYNTH:-0}"
 SWEEP_PREPARE_ONLY="${SWEEP_PREPARE_ONLY:-0}"
 HAZARD3_ULX4M_SYS_CLK_MHZ="${HAZARD3_ULX4M_SYS_CLK_MHZ:-40}"
 ULX4M_LITEDRAM_CPU="${ULX4M_LITEDRAM_CPU:-serv}"
-SYNTH_PROFILE_STAMP="${SYNTH_DIR}/fpga_ulx4m_ld.sys-clk-mhz"
-SYNTH_DURATION_STAMP="${SYNTH_DIR}/fpga_ulx4m_ld.synth-seconds"
-LITEDRAM_CPU_STAMP="${SYNTH_DIR}/fpga_ulx4m_ld.litedram-cpu"
-NETLIST="${SYNTH_DIR}/fpga_ulx4m_ld.json"
+SYNTH_PROFILE_STAMP="${BUILD_DIR}/fpga_ulx4m_ld.sys-clk-mhz"
+SYNTH_DURATION_STAMP="${BUILD_DIR}/fpga_ulx4m_ld.synth-seconds"
+LITEDRAM_CPU_STAMP="${BUILD_DIR}/fpga_ulx4m_ld.litedram-cpu"
+NETLIST="${BUILD_DIR}/fpga_ulx4m_ld.json"
 LPF="${SYNTH_DIR}/fpga_ulx4m_ld.lpf"
-SYNTH_LOG="${SYNTH_DIR}/synth.log"
+SYNTH_LOG="${BUILD_DIR}/fpga_ulx4m_ld.synth.log"
 
 # shellcheck source=scripts/sweep-ecp5-common.sh
 # shellcheck disable=SC1091
@@ -44,11 +45,11 @@ source "${COMMON_SCRIPT}"
 printf 'Include source: %s\n' "${COMMON_SCRIPT}" >&2
 
 generated_config="${LITEDRAM_DIR}/generated-${ULX4M_LITEDRAM_CPU}/litedram_ulx4m_cpu.yml"
-config_snapshot="${SYNTH_DIR}/fpga_ulx4m_ld.litedram-config.yml"
+config_snapshot="${BUILD_DIR}/fpga_ulx4m_ld.litedram-config.yml"
 
 sweep_ecp5_init_tuning
 TUNING_SUFFIX="$(sweep_ecp5_tuning_suffix)"
-SWEEP_DIR="${SYNTH_DIR}/routing-sweep/ulx4m-ld-${HAZARD3_ULX4M_SYS_CLK_MHZ}mhz-${ULX4M_LITEDRAM_CPU}${TUNING_SUFFIX}"
+SWEEP_DIR="${BUILD_DIR}/ulx4m-ld-seed-sweep/${HAZARD3_ULX4M_SYS_CLK_MHZ}mhz-${ULX4M_LITEDRAM_CPU}${TUNING_SUFFIX}"
 SWEEP_REL_DIR="${SWEEP_DIR#"${REPO_ROOT}"/}"
 
 usage()
@@ -126,6 +127,7 @@ sweep_ecp5_require_tool awk
 sweep_ecp5_require_tool grep
 sweep_ecp5_require_tool sed
 sweep_ecp5_require_file "${LPF}"
+mkdir -p "${BUILD_DIR}"
 
 synthesis_seconds="NA"
 if [[ -f "${SYNTH_DURATION_STAMP}" ]]; then
@@ -177,11 +179,18 @@ else
 
     synth_start_seconds="$(date +%s)"
     DEFINES="${DEFINES:+${DEFINES} }HAZARD3_ULX4M_SYS_CLK_MHZ=${HAZARD3_ULX4M_SYS_CLK_MHZ}" \
-        make -C "${SYNTH_DIR}" -f ULX4M_LD_85F.mk \
+        sweep_ecp5_run_synthesis "${SYNTH_DIR}" "${SYNTH_LOG}" \
+            -f ULX4M_LD_85F.mk \
+            CHIPNAME="${BUILD_DIR}/fpga_ulx4m_ld" \
             ULX4M_LITEDRAM_CPU="${ULX4M_LITEDRAM_CPU}" synth
     install -m 0644 "${generated_config}" "${config_snapshot}"
-    synthesis_seconds="$(( $(date +%s) - synth_start_seconds ))"
-    printf '%s\n' "${synthesis_seconds}" > "${SYNTH_DURATION_STAMP}"
+    if [[ "${SWEEP_SYNTHESIS_RAN}" == 1 ]]; then
+        synthesis_seconds="$(( $(date +%s) - synth_start_seconds ))"
+        printf '%s\n' "${synthesis_seconds}" > "${SYNTH_DURATION_STAMP}"
+    else
+        printf 'Synthesis reused the existing netlist; recorded duration remains %s.\n' \
+            "${synthesis_seconds}"
+    fi
     printf '%s\n' "${HAZARD3_ULX4M_SYS_CLK_MHZ}" > "${SYNTH_PROFILE_STAMP}"
 fi
 

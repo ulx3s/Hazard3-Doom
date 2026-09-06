@@ -34,6 +34,8 @@ SDCARD_DIR="${BOARD_BUILD_DIR}/sdcard"
 FPGA_OUTPUT="${ROOT_DIR}/build/fpga_ulx3s_12f.bit"
 MONITOR_OUTPUT="${MONITOR_BUILD_DIR}/hazard3-boot-monitor.elf"
 DOOM_OUTPUT="${DOOM_BUILD_DIR}/hazard3-doom.h3d"
+BOOT_HEX_SOURCE="${HAZARD3_ROOT}/example_soc/soc/hazard3-12f-bootstrap.hex"
+BOOT_HEX_OUTPUT="${BOARD_BUILD_DIR}/hazard3-12f-bootstrap.hex"
 MEMORY_PROFILE="${HAZARD3_MEMORY_PROFILE:-32m}"
 VIDEO_RESOLUTION="${HAZARD3_DOOM_HDMI_RESOLUTION:-320x200}"
 
@@ -68,7 +70,7 @@ printf 'ULX3S 12F build configuration: system clock=40 MHz, SDRAM profile=%s, vi
 require_file "${SYNTH_DIR}/ULX3S_12F.mk"
 require_file "${SYNTH_DIR}/fpga_ulx3s.lpf"
 require_file "${HAZARD3_ROOT}/example_soc/soc/cache_tags_zero_12f.hex"
-require_file "${HAZARD3_ROOT}/example_soc/soc/hazard3-12f-bootstrap.hex"
+require_file "${BOOT_HEX_SOURCE}"
 require_executable "${ROOT_DIR}/scripts/build.sh"
 require_executable "${ROOT_DIR}/scripts/build-ulx3s-12f-bitstream.sh"
 require_executable "${ROOT_DIR}/doom/build-doom-image.sh"
@@ -96,6 +98,7 @@ HAZARD3_DOOM_HDMI_RESOLUTION=320x200 \
 require_file "${DOOM_OUTPUT}"
 
 mkdir -p "${BOARD_BUILD_DIR}" "${SDCARD_DIR}"
+cp "${BOOT_HEX_SOURCE}" "${BOOT_HEX_OUTPUT}"
 printf '%s\n' "${MEMORY_PROFILE}" > "${BOARD_BUILD_DIR}/memory-profile.txt"
 printf 'compact-320x200-sdram-scanout\n' > "${BOARD_BUILD_DIR}/video-profile.txt"
 cp "${DOOM_OUTPUT}" "${SDCARD_DIR}/DOOM.H3D"
@@ -109,6 +112,7 @@ printf '  FPGA:    %s\n' "${FPGA_OUTPUT}"
 printf '  Monitor: %s\n' "${MONITOR_OUTPUT}"
 printf '  Doom:    %s\n' "${DOOM_OUTPUT}"
 printf '  SD H3D:  %s\n' "${SDCARD_DIR}/DOOM.H3D"
+printf '  Bootstrap HEX: %s\n' "${BOOT_HEX_OUTPUT}"
 printf '  Profile: %s SDRAM, 320x200 compact scanout\n' "${MEMORY_PROFILE}"
 printf '\nAfter programming the FPGA and starting OpenOCD, run:\n'
 printf '  ./scripts/load-firmware-12f.sh\n'

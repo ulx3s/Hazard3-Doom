@@ -1,18 +1,18 @@
 # Tiny Tapeout project information
 project:
   title:        "Hazard3-Doom Template"      # Project title
-  author:       "gojimmypi"      # Your name
-  discord:      "gojimmypi"      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description:  "Sample template"      # One line description of what your project does
-  language:     "Analog" # other examples include Verilog, Amaranth, VHDL, etc
-  clock_hz:     0       # Clock frequency in Hz (or 0 if not applicable)
+  author:       "gojimmypi"  # Your name
+  discord:      "gojimmypi"  # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
+  description:  "Template"   # One line description of what your project does
+  language:     "Verilog"    # other examples include Verilog, Amaranth, VHDL, etc
+  clock_hz:     0            # Clock frequency in Hz (or 0 if not applicable)
 
   # How many tiles your design occupies? A single tile is about 340x160 uM.
   tiles: "1x2"          # Valid values for analog projects: 1x2, 2x2, 3x2, 4x2
 
   # How many analog pins does your project use?
-  analog_pins: 2        # Valid values: 0 to 6
-  uses_vapwr: false     # Set to true if your project uses the second analog power supply (VAPWR) in addition to VDPWR (3.3V)
+  # analog_pins: 0        # Valid values: 0 to 6
+  # uses_vapwr: false     # Set to true if your project uses the second analog power supply (VAPWR) in addition to VDPWR (3.3V)
 
   # Your top module name must start with "tt_um_". Make it unique by including your github username:
   top_module:  "tt_um_ulx3s_example"

@@ -35,7 +35,7 @@
 #
 # git -C third_party/Hazard3 log -1 --oneline
 #
-# Currently: ea7e3d0 (HEAD) Merge pull request #8 from gojimmypi/ulx-doom-dev
+# Currently: 3c0aca0 (HEAD) Merge pull request #9 from gojimmypi/ulx-doom-dev
 #
 # git -C third_party/Hazard3 rev-parse HEAD:example_soc/libfpga
 # git -C third_party/Hazard3/example_soc/libfpga rev-parse HEAD

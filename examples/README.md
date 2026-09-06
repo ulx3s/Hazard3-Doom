@@ -16,5 +16,5 @@ Other examples for the Hazard3-Doom ecosystem
 
 ### Email
 
-- [ulx3s.fpga@gmail.com](ulx3s.fpga@gmail.com) (If you do not use chats)
+- [ulx3s.fpga@gmail.com](mailto:ulx3s.fpga@gmail.com) (If you do not use chats)
 

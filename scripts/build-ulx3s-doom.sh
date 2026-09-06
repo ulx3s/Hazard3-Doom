@@ -27,13 +27,14 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 HAZARD3_ROOT="${HAZARD3_ROOT:-${ROOT_DIR}/third_party/Hazard3}"
 SYNTH_DIR="${HAZARD3_ROOT}/example_soc/synth"
 BOARD_BUILD_DIR="${ROOT_DIR}/build/ulx3s"
-MONITOR_BUILD_DIR="${HAZARD3_BUILD_DIR:-${ROOT_DIR}/build}"
-DOOM_BUILD_DIR="${HAZARD3_DOOM_BUILD_DIR:-${ROOT_DIR}/build/doom-image}"
+MONITOR_BUILD_DIR="${HAZARD3_BUILD_DIR:-${BOARD_BUILD_DIR}/monitor}"
+DOOM_BUILD_DIR="${HAZARD3_DOOM_BUILD_DIR:-${BOARD_BUILD_DIR}/doom-image}"
 FPGA_OUTPUT="${ROOT_DIR}/build/fpga_ulx3s.bit"
 MONITOR_OUTPUT="${MONITOR_BUILD_DIR}/hazard3-boot-monitor.elf"
 MONITOR_BIN="${MONITOR_BUILD_DIR}/hazard3-boot-monitor.bin"
-BOOT_HEX="${HAZARD3_ROOT}/example_soc/soc/hazard3-boot-monitor.hex"
-SDCARD_DIR="${ROOT_DIR}/build/sdcard"
+BOOT_HEX_WORK="${HAZARD3_ROOT}/example_soc/soc/hazard3-boot-monitor.hex"
+BOOT_HEX_OUTPUT="${BOARD_BUILD_DIR}/hazard3-boot-monitor.hex"
+SDCARD_DIR="${BOARD_BUILD_DIR}/sdcard"
 DOOM_OUTPUT="${DOOM_BUILD_DIR}/hazard3-doom.h3d"
 HAZARD3_HDMI_EXTENDED_MODES="${HAZARD3_HDMI_EXTENDED_MODES:-1}"
 
@@ -98,6 +99,7 @@ printf 'ULX3S 85F build configuration: system clock=50 MHz, HDMI profile=%s, ext
     "${VIDEO_PROFILE}" "${HAZARD3_HDMI_EXTENDED_MODES}"
 
 require_tool make
+require_tool install
 require_tool python3
 require_file "${SYNTH_DIR}/ULX3S.mk"
 require_file "${HAZARD3_ROOT}/scripts/synth_ecp5.mk"
@@ -121,8 +123,10 @@ require_file "${MONITOR_OUTPUT}"
 require_file "${MONITOR_BIN}"
 
 printf '\nEmbedding the resident monitor into ULX3S EBR initialization...\n'
+mkdir -p "${BOARD_BUILD_DIR}"
 "${ROOT_DIR}/scripts/make-boot-hex.py" \
-    "${MONITOR_BIN}" "${BOOT_HEX}" --bytes 0x10000 --load-address 0x40
+    "${MONITOR_BIN}" "${BOOT_HEX_WORK}" --bytes 0x10000 --load-address 0x40
+install -m 0644 "${BOOT_HEX_WORK}" "${BOOT_HEX_OUTPUT}"
 
 printf '\nBuilding the Hazard3 ULX3S 85F FPGA target with cold-boot monitor...\n'
 FORCE_BITSTREAM_REBUILD=1 \
@@ -130,7 +134,6 @@ HAZARD3_HDMI_EXTENDED_MODES="${HAZARD3_HDMI_EXTENDED_MODES}" \
 HAZARD3_ROOT="${HAZARD3_ROOT}" \
     "${ROOT_DIR}/scripts/build-ulx3s-85f-bitstream.sh"
 
-mkdir -p "${BOARD_BUILD_DIR}"
 require_file "${FPGA_OUTPUT}"
 printf '%s\n' "${VIDEO_PROFILE}" > "${BOARD_BUILD_DIR}/video-profile.txt"
 
@@ -155,4 +158,4 @@ printf '  FPGA:    %s\n' "${FPGA_OUTPUT}"
 printf '  Monitor: %s\n' "${MONITOR_OUTPUT}"
 printf '  Doom:    %s\n' "${DOOM_OUTPUT}"
 printf '  SD H3D:  %s\n' "${SDCARD_DIR}/DOOM.H3D"
-printf '  Boot HEX:%s\n' "${BOOT_HEX}"
+printf '  Boot HEX: %s\n' "${BOOT_HEX_OUTPUT}"

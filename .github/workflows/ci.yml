@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  # explicit least-privilege setting for GITHUB_TOKEN, no write permissions needed
   contents: read
 
 concurrency:
@@ -113,9 +114,23 @@ jobs:
         run: |
           mkdir -p "${QUALITY_LOG_DIR}"
           set +e
-          python -m compileall -q doom tests 2>&1 | tee "${QUALITY_LOG_DIR}/python-syntax.log"
+          python -m compileall -q doom scripts tests web 2>&1 | tee "${QUALITY_LOG_DIR}/python-syntax.log"
           status=${PIPESTATUS[0]}
           set -e
+          exit "${status}"
+
+      - name: Check JavaScript syntax
+        id: javascript_syntax
+        continue-on-error: true
+        run: |
+          mkdir -p "${QUALITY_LOG_DIR}"
+          log="${QUALITY_LOG_DIR}/javascript-syntax.log"
+          status=0
+          for script in web/app.js web/flasher.js; do
+              if ! node --check "${script}" 2>&1 | tee -a "${log}"; then
+                  status=1
+              fi
+          done
           exit "${status}"
 
       - name: Run host-tool tests
@@ -137,6 +152,7 @@ jobs:
           SHELLCHECK_OUTCOME: ${{ steps.shellcheck.outcome }}
           EXECUTABLE_PERMISSIONS_OUTCOME: ${{ steps.executable_permissions.outcome }}
           PYTHON_SYNTAX_OUTCOME: ${{ steps.python_syntax.outcome }}
+          JAVASCRIPT_SYNTAX_OUTCOME: ${{ steps.javascript_syntax.outcome }}
           HOST_TOOL_TESTS_OUTCOME: ${{ steps.host_tool_tests.outcome }}
         run: bash .github/scripts/report-quality-checks.sh
 
@@ -576,7 +592,7 @@ jobs:
 
           status=0
           for profile in 64m 32m; do
-              for clock_hz in 50000000 25000000; do
+              for clock_hz in 50000000 40000000; do
                   build_dir="build/ci/monitor-${profile}-${clock_hz}"
                   elf="${build_dir}/hazard3-boot-monitor.elf"
                   label="monitor profile=${profile} clock=${clock_hz}"
@@ -745,14 +761,8 @@ jobs:
           | Board | SDRAM profile | Monitor clock |
           |---|---:|---:|
           | ULX3S 85F | `64m` | 50 MHz |
-          | ULX4M-LD 85F | `64m` | 25 MHz* |
+          | ULX4M-LD 85F | `64m` | 40 MHz |
           | ULX4M-LS 85F | `32m` | 50 MHz |
-
-          * The repository's monitor build instructions currently use 25 MHz
-            for ULX4M-LD. The board-profile summary elsewhere in the README
-            lists 50 MHz for ULX4M-LD; this CI artifact README follows the
-            explicit monitor build command and does not attempt to resolve that
-            documentation discrepancy.
 
           ## Directory contents
 
@@ -761,9 +771,8 @@ jobs:
           | `doom-64m/` | Doom ELF, map, and packaged H3D image using the 64 MiB memory map | ULX3S 85F and ULX4M-LD 85F |
           | `doom-32m/` | Doom ELF, map, and packaged H3D image using the 32 MiB memory map | ULX4M-LS 85F |
           | `monitor-64m-50000000/` | Resident monitor built for 64 MiB SDRAM at 50 MHz | ULX3S 85F |
-          | `monitor-64m-25000000/` | Resident monitor built for 64 MiB SDRAM at 25 MHz | ULX4M-LD 85F per the explicit monitor build instructions |
+          | `monitor-64m-40000000/` | Resident monitor built for 64 MiB SDRAM at 40 MHz | ULX4M-LD 85F |
           | `monitor-32m-50000000/` | Resident monitor built for 32 MiB SDRAM at 50 MHz | ULX4M-LS 85F |
-          | `monitor-32m-25000000/` | Resident monitor built for 32 MiB SDRAM at 25 MHz | CI compatibility build; no documented board target |
 
           ## ULX3S files
 

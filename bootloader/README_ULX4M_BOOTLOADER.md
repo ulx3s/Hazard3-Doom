@@ -639,7 +639,7 @@ cd /mnt/c/workspace/Hazard3-Doom
     --vid 0x1d50 \
     --pid 0x614b \
     --altsetting 0 \
-    ./third_party/Hazard3/example_soc/synth/fpga_ulx4m_ld.bit
+    ./build/fpga_ulx4m_ld.bit
 ```
 
 Alt 0 begins at flash address `0x200000`; this operation does not overwrite the

@@ -22,6 +22,7 @@ on:
       - ".github/workflows/ulx4m-bootloader.yml"
 
 permissions:
+  # explicit least-privilege setting for GITHUB_TOKEN, no write permissions needed
   contents: read
 
 env:

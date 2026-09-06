@@ -24,14 +24,16 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 HAZARD3_ROOT="${HAZARD3_ROOT:-${REPO_ROOT}/third_party/Hazard3}"
 SYNTH_DIR="${HAZARD3_ROOT}/example_soc/synth"
+BUILD_DIR="${REPO_ROOT}/build"
 COMMON_SCRIPT="${SCRIPT_DIR}/sweep-ecp5-common.sh"
 SWEEP_JOBS="${SWEEP_JOBS:-4}"
 SWEEP_SKIP_SYNTH="${SWEEP_SKIP_SYNTH:-0}"
 SWEEP_PREPARE_ONLY="${SWEEP_PREPARE_ONLY:-0}"
 HAZARD3_HDMI_EXTENDED_MODES="${HAZARD3_HDMI_EXTENDED_MODES:-1}"
-SYNTH_PROFILE_STAMP="${SYNTH_DIR}/fpga_ulx3s.video-profile"
-SYNTH_DURATION_STAMP="${SYNTH_DIR}/fpga_ulx3s.synth-seconds"
-NETLIST="${SYNTH_DIR}/fpga_ulx3s.json"
+SYNTH_PROFILE_STAMP="${BUILD_DIR}/fpga_ulx3s.video-profile"
+SYNTH_DURATION_STAMP="${BUILD_DIR}/fpga_ulx3s.synth-seconds"
+SYNTH_LOG="${BUILD_DIR}/fpga_ulx3s.synth.log"
+NETLIST="${BUILD_DIR}/fpga_ulx3s.json"
 LPF="${SYNTH_DIR}/fpga_ulx3s.lpf"
 
 # shellcheck source=scripts/sweep-ecp5-common.sh
@@ -41,7 +43,7 @@ echo "Include source: ${COMMON_SCRIPT}"
 
 sweep_ecp5_init_tuning
 TUNING_SUFFIX="$(sweep_ecp5_tuning_suffix)"
-SWEEP_DIR="${REPO_ROOT}/build/ulx3s-seed-sweep${TUNING_SUFFIX}"
+SWEEP_DIR="${BUILD_DIR}/ulx3s-seed-sweep${TUNING_SUFFIX}"
 SWEEP_REL_DIR="${SWEEP_DIR#"${REPO_ROOT}"/}"
 
 usage()
@@ -115,6 +117,7 @@ sweep_ecp5_require_tool awk
 sweep_ecp5_require_tool grep
 sweep_ecp5_require_tool sed
 sweep_ecp5_require_file "${LPF}"
+mkdir -p "${BUILD_DIR}"
 
 synthesis_seconds="NA"
 if [[ -f "${SYNTH_DURATION_STAMP}" ]]; then
@@ -145,9 +148,7 @@ else
     if [[ "${current_profile}" != "${VIDEO_PROFILE}" ]]; then
         rm -f \
             "${NETLIST}" \
-            "${SYNTH_DIR}/fpga_ulx3s.config" \
-            "${SYNTH_DIR}/fpga_ulx3s.bit" \
-            "${SYNTH_DIR}/fpga_ulx3s.svf" \
+            "${SYNTH_LOG}" \
             "${SYNTH_DURATION_STAMP}"
     fi
 
@@ -155,15 +156,26 @@ else
         "${VIDEO_PROFILE}" "${HAZARD3_HDMI_EXTENDED_MODES}"
 
     synth_start_seconds="$(date +%s)"
-    make -C "${SYNTH_DIR}" -f ULX3S.mk \
+    sweep_ecp5_run_synthesis "${SYNTH_DIR}" "${SYNTH_LOG}" \
+        -f ULX3S.mk \
+        CHIPNAME="${BUILD_DIR}/fpga_ulx3s" \
         HAZARD3_HDMI_EXTENDED_MODES="${HAZARD3_HDMI_EXTENDED_MODES}" synth
-    synthesis_seconds="$(( $(date +%s) - synth_start_seconds ))"
-    printf '%s\n' "${synthesis_seconds}" > "${SYNTH_DURATION_STAMP}"
+    if [[ "${SWEEP_SYNTHESIS_RAN}" == 1 ]]; then
+        synthesis_seconds="$(( $(date +%s) - synth_start_seconds ))"
+        printf '%s\n' "${synthesis_seconds}" > "${SYNTH_DURATION_STAMP}"
+    else
+        printf 'Synthesis reused the existing netlist; recorded duration remains %s.\n' \
+            "${synthesis_seconds}"
+    fi
     printf '%s\n' "${VIDEO_PROFILE}" > "${SYNTH_PROFILE_STAMP}"
 fi
 
 [[ -s "${NETLIST}" ]] || {
     echo "Missing synthesized ULX3S 85F netlist: ${NETLIST}" >&2
+    exit 1
+}
+[[ -s "${SYNTH_LOG}" ]] || {
+    echo "Missing ULX3S 85F synthesis log: ${SYNTH_LOG}" >&2
     exit 1
 }
 
