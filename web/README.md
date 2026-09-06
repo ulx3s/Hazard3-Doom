@@ -1,6 +1,8 @@
 # Hazard3-Doom Web Console
 
-A dependency-free static web app for the Hazard3-Doom UART console, H3D image loading, and ULX3S FPGA programming from a Chromium-based browser using Web Serial and WebUSB.
+Try it live at [ulx3s.github.io/Hazard3-Doom](https://ulx3s.github.io/Hazard3-Doom/)
+
+A dependency-free static web app for the Hazard3-Doom UART console, H3D image and IWAD loading, and ULX3S FPGA programming from a Chromium-based browser using Web Serial and WebUSB.
 
 Windows users need to change drivers from default **FTDI** to **WinUSB** to use the WebUSB programmer.
 
@@ -20,7 +22,9 @@ Click "Update" and allow Windows to search for default drivers. Be sure to disco
 - Enumerate all serial ports already authorized for this site and select which one Reconnect opens.
 - Reconnect to the selected previously authorized port.
 - Validate and upload packaged `.h3d` Doom images over UART using the monitor H3L handshake, with optional launch after upload.
-- Configurable baud rate, data bits, parity, stop bits, and line ending.
+- Validate and upload legal `.wad` IWAD files over UART using the monitor H3W handshake, with 64 MiB/32 MiB memory-profile selection and optional launch after upload.
+- Configurable baud rate, data bits, parity, stop bits, and line ending, with all six serial controls kept on one desktop row.
+- Collapsible Serial connection panel containing the connection settings and upload/programming tools.
 - Live UART receive terminal with a bounded 1,000,000-character scrollback buffer.
 - Command entry with Up/Down command history.
 - RX/TX byte counters and session timer.
@@ -55,7 +59,7 @@ From this directory, use the project server to enable the console firmware loade
 
 Then open `http://localhost:8000/` in a browser that supports Web Serial.
 
-The static UART, H3D, and FPGA controls also work with a generic static server,
+The static UART, H3D, IWAD, and FPGA controls also work with a generic static server,
 but the console firmware loader will be unavailable:
 
 ```bash
@@ -129,6 +133,28 @@ monitor -> H3L OK ...\r\n
 The payload is sent in 4096-byte browser writes while the page shows transfer progress. Normal UART command controls and screen-snip capability probes are suspended during the binary transfer so no unrelated byte can be inserted into the H3D payload. The monitor still performs its own header and CRC validation before accepting the image.
 
 **Launch with `j` after upload** is optional and disabled by default. When selected, the browser sends the monitor's raw `j` command only after `H3L OK` is received.
+
+## Doom IWAD UART uploader
+
+The collapsible **Doom IWAD uploader** accepts a legally obtained `.wad` file and follows the same H3W protocol as `doom/upload-wad.py`. The browser validates the `IWAD` identification, directory bounds, every lump range, Doom-visible filename, reserved SDRAM size, and CRC32 before sending anything.
+
+Select the memory profile that matches the resident monitor build:
+
+- `64m`: load address `0x22c00000`, for ULX3S and ULX4M-LD.
+- `32m`: load address `0x21000000`, for ULX4M-LS.
+
+The transfer sequence is:
+
+```text
+browser -> w
+monitor -> H3W READY\r\n
+browser -> 64-byte H3W header
+monitor -> H3W DATA\r\n
+browser -> raw IWAD bytes
+monitor -> H3W OK ...\r\n
+```
+
+The IWAD is sent in 4096-byte writes with visible byte and percentage progress. Normal command controls and screen-snip probes are suspended until the binary transfer completes. **Launch with `j` after upload** remains optional and is sent only after `H3W OK`. Commercial IWAD files are not provided by this project and should not be committed to the repository.
 
 ## HDMI screen snip
 

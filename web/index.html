@@ -4,14 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#171a21">
-    <title>Hazard3-Doom UART Console</title>
-    <link rel="stylesheet" href="styles.css?v=20260821-r1">
+    <title>Hazard3-Doom Console</title>
+    <link rel="stylesheet" href="styles.css?v=20260906-r2">
 </head>
 <body>
     <header class="app-header">
         <div>
             <div class="eyebrow">ULX3S / Hazard3-Doom</div>
-            <h1>UART Console</h1>
+            <h1>Console and device uploading tool</h1>
         </div>
         <div class="header-actions">
             <nav class="project-links" aria-label="Hazard3-Doom project links">
@@ -41,17 +41,20 @@
     </header>
 
     <main class="layout">
-        <section class="panel serial-panel" aria-labelledby="serial-title">
-            <div class="panel-heading">
+        <details class="panel serial-panel" aria-labelledby="serial-title" open>
+            <summary class="serial-panel-summary">
                 <div>
                     <h2 id="serial-title">Serial connection</h2>
                     <p>Direct browser connection using the Web Serial API.</p>
                 </div>
-                <div class="connection-actions">
+                <span class="summary-tag">Web Serial</span>
+            </summary>
+
+            <div class="serial-panel-body">
+                <div class="connection-actions serial-connection-actions">
                     <button id="reconnectButton" type="button" class="secondary">Reconnect</button>
                     <button id="connectButton" type="button" class="primary">Connect</button>
                 </div>
-            </div>
 
             <div id="unsupportedNotice" class="notice error hidden" role="alert">
                 Web Serial is not available in this browser. Use a Chromium-based browser with Web Serial support and serve this page from HTTPS or localhost.
@@ -271,7 +274,68 @@
                     <p class="flasher-note"><strong>The H3L loader must own the UART.</strong> If Doom is running, use Stop Doom first and wait for the resident monitor <code>&gt;</code> prompt before uploading.</p>
                 </div>
             </details>
-        </section>
+
+            <details id="wadUploader" class="flasher-section">
+                <summary>Doom IWAD uploader <span class="summary-tag">UART / H3W</span></summary>
+                <div class="flasher-body">
+                    <div class="flasher-intro">
+                        <div>
+                            <h3>Load a Doom IWAD over UART</h3>
+                            <p>Select a legally obtained <code>.wad</code> file and send it to the resident monitor's reserved SDRAM IWAD region. The browser validates the IWAD header, directory, lump bounds, filename, and CRC32 before transfer.</p>
+                        </div>
+                        <div class="flasher-state">
+                            <span>Protocol</span>
+                            <strong>H3W over Web Serial</strong>
+                            <span>Monitor</span>
+                            <strong>Use from the &gt; prompt</strong>
+                        </div>
+                    </div>
+
+                    <div class="flasher-grid">
+                        <div class="svf-picker">
+                            <span>Doom IWAD (.wad)</span>
+                            <input id="wadFileInput" type="file" accept=".wad,application/octet-stream">
+                            <strong id="wadFileName">No IWAD selected</strong>
+                            <small id="wadFileDetails"></small>
+                            <div class="wad-options">
+                                <label>
+                                    <span>Doom filename</span>
+                                    <input id="wadVisibleName" type="text" maxlength="15" spellcheck="false" placeholder="doom1.wad">
+                                </label>
+                                <label>
+                                    <span>Memory profile</span>
+                                    <select id="wadMemoryProfile">
+                                        <option value="64m" selected>64 MiB - ULX3S / ULX4M-LD</option>
+                                        <option value="32m">32 MiB - ULX4M-LS</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="flasher-checklist">
+                            <strong>Upload flow</strong>
+                            <span>1. Connect the UART terminal.</span>
+                            <span>2. Stop Doom first if it is currently running.</span>
+                            <span>3. Select an IWAD and the memory profile matching the monitor build.</span>
+                            <span>4. Upload; the browser performs the H3W READY/DATA/OK handshake.</span>
+                            <label class="check-control"><input id="wadLaunchAfterUpload" type="checkbox"> Launch with <code>j</code> after upload</label>
+                        </div>
+                    </div>
+
+                    <div class="flasher-actions">
+                        <button id="wadUploadButton" type="button" class="primary" disabled>Upload IWAD</button>
+                    </div>
+
+                    <div class="flasher-progress-row">
+                        <progress id="wadProgress" max="100" value="0"></progress>
+                        <span id="wadProgressLabel">Idle</span>
+                    </div>
+
+                    <p class="flasher-note"><strong>IWAD files are not included with Hazard3-Doom.</strong> Use a legally obtained IWAD. The selected memory profile must match the resident monitor build because the H3W header contains the SDRAM load address.</p>
+                </div>
+            </details>
+            </div>
+        </details>
 
         <section class="panel terminal-panel" aria-labelledby="terminal-title">
             <div class="panel-heading terminal-heading">
@@ -378,7 +442,7 @@
         <span>UART and FPGA programming data stay between this browser and the selected devices; console firmware uses the local loader.</span>
     </footer>
 
-    <script src="app.js?v=20260826-r8" defer></script>
+    <script src="app.js?v=20260906-r9" defer></script>
     <script src="flasher.js?v=20260821-r1" defer></script>
 </body>
 </html>

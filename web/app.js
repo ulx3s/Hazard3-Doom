@@ -24,6 +24,21 @@ const H3D_OK_MARKER = "H3L OK";
 const H3D_ERROR_MARKER = "H3L ERROR";
 const H3D_RESPONSE_TIMEOUT_MS = 10_000;
 const H3D_RESULT_MARGIN_MS = 20_000;
+const WAD_PACKAGE_MAGIC = 0x31573348;
+const WAD_HEADER_BYTES = 64;
+const WAD_FORMAT_VERSION = 1;
+const WAD_FLAG_CRC32 = 1;
+const WAD_UPLOAD_CHUNK_BYTES = 4096;
+const WAD_READY_MARKER = "H3W READY\r\n";
+const WAD_DATA_MARKER = "H3W DATA\r\n";
+const WAD_OK_MARKER = "H3W OK";
+const WAD_ERROR_MARKER = "H3W ERROR";
+const WAD_RESPONSE_TIMEOUT_MS = 10_000;
+const WAD_RESULT_MARGIN_MS = 20_000;
+const WAD_MEMORY_PROFILES = {
+    "64m": { base: 0x22c00000, limit: 0x23c00000 },
+    "32m": { base: 0x21000000, limit: 0x21c00000 },
+};
 const CONSOLE_FIRMWARE_MAX_BYTES = 16 * 1024 * 1024;
 
 const state = {
@@ -46,7 +61,10 @@ const state = {
     screenSnipWatchTimer: null,
     screenSnipTransitionDeadline: 0,
     h3dImage: null,
-    h3dWaiter: null,
+    wadBytes: null,
+    wadCrc32: null,
+    wadImage: null,
+    serialResponseWaiter: null,
     consoleFirmware: null,
     consoleFirmwareLoaderAvailable: false,
     consoleFirmwareBusy: false,
@@ -85,6 +103,15 @@ const els = {
     h3dLaunchAfterUpload: document.getElementById("h3dLaunchAfterUpload"),
     h3dProgress: document.getElementById("h3dProgress"),
     h3dProgressLabel: document.getElementById("h3dProgressLabel"),
+    wadFileInput: document.getElementById("wadFileInput"),
+    wadFileName: document.getElementById("wadFileName"),
+    wadFileDetails: document.getElementById("wadFileDetails"),
+    wadVisibleName: document.getElementById("wadVisibleName"),
+    wadMemoryProfile: document.getElementById("wadMemoryProfile"),
+    wadUploadButton: document.getElementById("wadUploadButton"),
+    wadLaunchAfterUpload: document.getElementById("wadLaunchAfterUpload"),
+    wadProgress: document.getElementById("wadProgress"),
+    wadProgressLabel: document.getElementById("wadProgressLabel"),
     firmwareLoaderStatus: document.getElementById("firmwareLoaderStatus"),
     firmwareFileInput: document.getElementById("firmwareFileInput"),
     firmwareFileName: document.getElementById("firmwareFileName"),
@@ -116,6 +143,9 @@ function screenSnipStatusText() {
     if (state.serialOperation === "h3d-upload") {
         return "Screen snip is paused while an H3D image is uploading.";
     }
+    if (state.serialOperation === "wad-upload") {
+        return "Screen snip is paused while an IWAD is uploading.";
+    }
     if (state.screenSnipCapability === "checking") {
         return "Checking whether the active firmware screen supports screen snip.";
     }
@@ -142,6 +172,7 @@ function updateScreenSnipUi() {
     els.screenSnipButton.setAttribute("aria-label", status);
     updateConsoleFirmwareUi();
     updateH3dUploaderUi();
+    updateWadUploaderUi();
 }
 
 function setScreenSnipCapability(capability) {
@@ -270,17 +301,23 @@ function formatHex32(value) {
     return `0x${value.toString(16).padStart(8, "0")}`;
 }
 
+const CRC32_TABLE = (() => {
+    const table = new Uint32Array(256);
+    for (let value = 0; value < table.length; ++value) {
+        let crc = value;
+        for (let bit = 0; bit < 8; ++bit) {
+            crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+        }
+        table[value] = crc >>> 0;
+    }
+    return table;
+})();
+
 function crc32(bytes) {
     let crc = 0xffffffff;
-
     for (const byte of bytes) {
-        crc ^= byte;
-        for (let bit = 0; bit < 8; ++bit) {
-            const mask = -(crc & 1);
-            crc = (crc >>> 1) ^ (0xedb88320 & mask);
-        }
+        crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ byte) & 0xff];
     }
-
     return (crc ^ 0xffffffff) >>> 0;
 }
 
@@ -503,22 +540,22 @@ function setSerialOperation(operation) {
     setConnectionUi(Boolean(state.port), state.port ? describePort(state.port) : "");
 }
 
-function clearH3dWaiter(error = null) {
-    const waiter = state.h3dWaiter;
+function clearSerialResponseWaiter(error = null) {
+    const waiter = state.serialResponseWaiter;
     if (!waiter) {
         return;
     }
 
     window.clearTimeout(waiter.timeoutId);
-    state.h3dWaiter = null;
+    state.serialResponseWaiter = null;
     if (error) {
         waiter.reject(error);
     }
 }
 
-function waitForH3dResponse(markers, timeoutMs, description) {
-    if (state.h3dWaiter) {
-        return Promise.reject(new Error("another H3D response is already pending"));
+function waitForSerialResponse(markers, timeoutMs, description) {
+    if (state.serialResponseWaiter) {
+        return Promise.reject(new Error("another serial upload response is already pending"));
     }
 
     return new Promise((resolve, reject) => {
@@ -528,19 +565,19 @@ function waitForH3dResponse(markers, timeoutMs, description) {
             resolve,
             reject,
             timeoutId: window.setTimeout(() => {
-                if (state.h3dWaiter !== waiter) {
+                if (state.serialResponseWaiter !== waiter) {
                     return;
                 }
-                state.h3dWaiter = null;
+                state.serialResponseWaiter = null;
                 reject(new Error(`timed out waiting for ${description}`));
             }, timeoutMs),
         };
-        state.h3dWaiter = waiter;
+        state.serialResponseWaiter = waiter;
     });
 }
 
-function observeH3dResponse(bytes) {
-    const waiter = state.h3dWaiter;
+function observeSerialResponse(bytes) {
+    const waiter = state.serialResponseWaiter;
     if (!waiter) {
         return;
     }
@@ -555,7 +592,7 @@ function observeH3dResponse(bytes) {
             continue;
         }
         window.clearTimeout(waiter.timeoutId);
-        state.h3dWaiter = null;
+        state.serialResponseWaiter = null;
         waiter.resolve(marker);
         return;
     }
@@ -622,12 +659,12 @@ async function uploadH3dImage() {
         `CRC32=${formatHex32(image.payloadCrc32)}.`);
 
     try {
-        const readyPromise = waitForH3dResponse(
+        const readyPromise = waitForSerialResponse(
             [H3D_READY_MARKER, H3D_ERROR_MARKER],
             H3D_RESPONSE_TIMEOUT_MS,
             "H3L READY");
         if (!await writeBytes(new Uint8Array([0x6c]))) {
-            clearH3dWaiter();
+            clearSerialResponseWaiter();
             throw new Error("could not send the H3D loader command");
         }
         const readyResult = await readyPromise;
@@ -636,12 +673,12 @@ async function uploadH3dImage() {
         }
 
         els.h3dProgressLabel.textContent = "Sending 64-byte header...";
-        const dataPromise = waitForH3dResponse(
+        const dataPromise = waitForSerialResponse(
             [H3D_DATA_MARKER, H3D_ERROR_MARKER],
             H3D_RESPONSE_TIMEOUT_MS,
             "H3L DATA");
         if (!await writeBytes(image.packageBytes.subarray(0, image.headerBytes))) {
-            clearH3dWaiter();
+            clearSerialResponseWaiter();
             throw new Error("could not send the H3D header");
         }
         const dataResult = await dataPromise;
@@ -651,7 +688,7 @@ async function uploadH3dImage() {
 
         const wireMs = Math.ceil(
             (image.headerBytes + image.imageBytes) * 10 * 1000 / Number(els.baudRate.value));
-        const resultPromise = waitForH3dResponse(
+        const resultPromise = waitForSerialResponse(
             [H3D_OK_MARKER, H3D_ERROR_MARKER],
             Math.max(H3D_RESULT_MARGIN_MS, wireMs + H3D_RESULT_MARGIN_MS),
             "H3L OK");
@@ -660,7 +697,7 @@ async function uploadH3dImage() {
         while (sent < image.payload.byteLength) {
             const end = Math.min(sent + H3D_UPLOAD_CHUNK_BYTES, image.payload.byteLength);
             if (!await writeBytes(image.payload.subarray(sent, end))) {
-                clearH3dWaiter();
+                clearSerialResponseWaiter();
                 throw new Error("serial write failed during H3D payload upload");
             }
             sent = end;
@@ -692,7 +729,282 @@ async function uploadH3dImage() {
             `H3D upload failed: ${error.message}. ` +
             "Make sure the resident monitor prompt is active; stop Doom before retrying.");
     } finally {
-        clearH3dWaiter();
+        clearSerialResponseWaiter();
+        setSerialOperation(null);
+        if (uploadSucceeded) {
+            beginScreenSnipTransitionProbe(launchAfterUpload ? 2000 : 750);
+        } else {
+            state.screenSnipTransitionDeadline = 0;
+            setScreenSnipCapability("unavailable");
+            scheduleScreenSnipProbe(6000);
+        }
+    }
+}
+
+
+function validateWadVisibleName(name) {
+    if (name.length < 5 || name.length >= 16) {
+        throw new Error("WAD name must be 5-15 ASCII characters");
+    }
+    if (!name.toLowerCase().endsWith(".wad")) {
+        throw new Error("WAD name must end in .wad");
+    }
+    if (!/^[A-Za-z0-9._-]+$/.test(name)) {
+        throw new Error("WAD name may contain only letters, digits, '.', '_' and '-'");
+    }
+    if ([...name].some((character) => character.charCodeAt(0) > 0x7f)) {
+        throw new Error("WAD name must contain ASCII characters only");
+    }
+
+    const encoded = new Uint8Array(16);
+    encoded.set(new TextEncoder().encode(name));
+    return encoded;
+}
+
+function validateIwad(bytes, profileName) {
+    const profile = WAD_MEMORY_PROFILES[profileName];
+    if (!profile) {
+        throw new Error(`unknown memory profile ${profileName}`);
+    }
+    if (bytes.byteLength < 12) {
+        throw new Error("file is shorter than a WAD header");
+    }
+    if (bytes.byteLength > profile.limit - profile.base) {
+        const reservedMiB = (profile.limit - profile.base) / (1024 * 1024);
+        throw new Error(`IWAD exceeds the reserved ${reservedMiB} MiB SDRAM region`);
+    }
+    if (String.fromCharCode(...bytes.subarray(0, 4)) !== "IWAD") {
+        throw new Error("this milestone requires an IWAD file");
+    }
+
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const lumpCount = view.getUint32(4, true);
+    const directoryOffset = view.getUint32(8, true);
+    const directoryBytes = lumpCount * 16;
+
+    if (lumpCount === 0 || directoryOffset > bytes.byteLength ||
+        directoryBytes > bytes.byteLength - directoryOffset) {
+        throw new Error("IWAD directory is outside the file");
+    }
+
+    for (let index = 0; index < lumpCount; ++index) {
+        const entryOffset = directoryOffset + index * 16;
+        const filePosition = view.getUint32(entryOffset, true);
+        const lumpBytes = view.getUint32(entryOffset + 4, true);
+        if (filePosition > bytes.byteLength || lumpBytes > bytes.byteLength - filePosition) {
+            throw new Error(`IWAD lump ${index} is outside the file`);
+        }
+    }
+
+    return { profile, lumpCount, directoryOffset };
+}
+
+function createWadHeader(bytes, visibleName, profileName, payloadCrc32) {
+    const encodedName = validateWadVisibleName(visibleName);
+    const { profile, lumpCount, directoryOffset } = validateIwad(bytes, profileName);
+    if (payloadCrc32 === null || payloadCrc32 === undefined) {
+        payloadCrc32 = crc32(bytes);
+    }
+    const header = new Uint8Array(WAD_HEADER_BYTES);
+    const view = new DataView(header.buffer);
+    const words = [
+        WAD_PACKAGE_MAGIC,
+        WAD_HEADER_BYTES,
+        WAD_FORMAT_VERSION,
+        WAD_FLAG_CRC32,
+        profile.base,
+        bytes.byteLength,
+        payloadCrc32,
+        0,
+    ];
+    words.forEach((value, index) => view.setUint32(index * 4, value, true));
+    header.set(encodedName, 32);
+
+    return {
+        header,
+        payload: bytes,
+        payloadBytes: bytes.byteLength,
+        payloadCrc32,
+        loadAddress: profile.base,
+        lumpCount,
+        directoryOffset,
+        visibleName,
+        profileName,
+    };
+}
+
+function updateWadUploaderUi() {
+    const uploading = state.serialOperation === "wad-upload";
+    const ready = Boolean(state.port && state.wadImage &&
+        state.serialOperation === null && state.screenSnip === null &&
+        !state.consoleFirmwareBusy);
+
+    els.wadFileInput.disabled = uploading || state.consoleFirmwareBusy;
+    els.wadVisibleName.disabled = uploading || state.consoleFirmwareBusy;
+    els.wadMemoryProfile.disabled = uploading || state.consoleFirmwareBusy;
+    els.wadLaunchAfterUpload.disabled = uploading || state.consoleFirmwareBusy;
+    els.wadUploadButton.disabled = !ready;
+    els.wadUploadButton.textContent = uploading ? "Uploading..." : "Upload IWAD";
+}
+
+function refreshWadImage() {
+    state.wadImage = null;
+    if (!state.wadBytes) {
+        updateWadUploaderUi();
+        return;
+    }
+
+    try {
+        const image = createWadHeader(
+            state.wadBytes,
+            els.wadVisibleName.value.trim(),
+            els.wadMemoryProfile.value,
+            state.wadCrc32);
+        state.wadImage = image;
+        els.wadFileDetails.textContent =
+            `${image.payloadBytes.toLocaleString()} bytes | ${image.lumpCount.toLocaleString()} lumps | ` +
+            `directory ${formatHex32(image.directoryOffset)} | CRC32 ${formatHex32(image.payloadCrc32)} | ` +
+            `load ${formatHex32(image.loadAddress)}`;
+    } catch (error) {
+        els.wadFileDetails.textContent = `Invalid IWAD: ${error.message}`;
+    }
+
+    updateWadUploaderUi();
+}
+
+async function selectWadFile() {
+    state.wadBytes = null;
+    state.wadCrc32 = null;
+    state.wadImage = null;
+    els.wadFileName.textContent = "No IWAD selected";
+    els.wadFileDetails.textContent = "";
+    els.wadProgress.value = 0;
+    els.wadProgressLabel.textContent = "Idle";
+
+    const file = els.wadFileInput.files?.[0];
+    if (!file) {
+        els.wadVisibleName.value = "";
+        updateWadUploaderUi();
+        return;
+    }
+
+    els.wadFileName.textContent = file.name;
+    els.wadVisibleName.value = file.name.toLowerCase();
+    els.wadFileDetails.textContent = "Validating IWAD directory and CRC32...";
+    try {
+        state.wadBytes = new Uint8Array(await file.arrayBuffer());
+        validateIwad(state.wadBytes, els.wadMemoryProfile.value);
+        state.wadCrc32 = crc32(state.wadBytes);
+        refreshWadImage();
+    } catch (error) {
+        els.wadFileDetails.textContent = `Could not read IWAD: ${error.message}`;
+        updateWadUploaderUi();
+    }
+}
+
+async function uploadWadImage() {
+    const image = state.wadImage;
+    if (!state.port?.writable) {
+        appendSystem("IWAD upload requires an open serial connection.");
+        return;
+    }
+    if (!image) {
+        appendSystem("Select a valid IWAD first.");
+        return;
+    }
+    if (state.serialOperation !== null || state.screenSnip !== null) {
+        appendSystem("Another serial operation is already in progress.");
+        return;
+    }
+
+    const launchAfterUpload = els.wadLaunchAfterUpload.checked;
+    let uploadSucceeded = false;
+    const startedAt = performance.now();
+
+    cancelScheduledScreenSnipProbe();
+    stopScreenSnipCapabilityWatch();
+    clearScreenSnipProbe();
+    setScreenSnipCapability("checking");
+    setSerialOperation("wad-upload");
+    els.wadProgress.value = 0;
+    els.wadProgressLabel.textContent = "Starting monitor IWAD loader...";
+    appendSystem(
+        `IWAD upload: ${image.visibleName}, profile=${image.profileName}, ` +
+        `bytes=${image.payloadBytes.toLocaleString()}, lumps=${image.lumpCount.toLocaleString()}, ` +
+        `CRC32=${formatHex32(image.payloadCrc32)}.`);
+
+    try {
+        const readyPromise = waitForSerialResponse(
+            [WAD_READY_MARKER, WAD_ERROR_MARKER],
+            WAD_RESPONSE_TIMEOUT_MS,
+            "H3W READY");
+        if (!await writeBytes(new Uint8Array([0x77]))) {
+            clearSerialResponseWaiter();
+            throw new Error("could not send the IWAD loader command");
+        }
+        const readyResult = await readyPromise;
+        if (readyResult === WAD_ERROR_MARKER) {
+            throw new Error("monitor reported an H3W error before receiving the header");
+        }
+
+        els.wadProgressLabel.textContent = "Sending 64-byte header...";
+        const dataPromise = waitForSerialResponse(
+            [WAD_DATA_MARKER, WAD_ERROR_MARKER],
+            WAD_RESPONSE_TIMEOUT_MS,
+            "H3W DATA");
+        if (!await writeBytes(image.header)) {
+            clearSerialResponseWaiter();
+            throw new Error("could not send the IWAD header");
+        }
+        const dataResult = await dataPromise;
+        if (dataResult === WAD_ERROR_MARKER) {
+            throw new Error("monitor rejected the IWAD header");
+        }
+
+        const wireMs = Math.ceil(
+            (WAD_HEADER_BYTES + image.payloadBytes) * 10 * 1000 / Number(els.baudRate.value));
+        const resultPromise = waitForSerialResponse(
+            [WAD_OK_MARKER, WAD_ERROR_MARKER],
+            Math.max(WAD_RESULT_MARGIN_MS, wireMs + WAD_RESULT_MARGIN_MS),
+            "H3W OK");
+
+        let sent = 0;
+        while (sent < image.payload.byteLength) {
+            const end = Math.min(sent + WAD_UPLOAD_CHUNK_BYTES, image.payload.byteLength);
+            if (!await writeBytes(image.payload.subarray(sent, end))) {
+                clearSerialResponseWaiter();
+                throw new Error("serial write failed during IWAD upload");
+            }
+            sent = end;
+            const percent = sent * 100 / image.payload.byteLength;
+            els.wadProgress.value = percent;
+            els.wadProgressLabel.textContent =
+                `${sent.toLocaleString()} / ${image.payload.byteLength.toLocaleString()} bytes ` +
+                `(${percent.toFixed(1)}%)`;
+        }
+
+        const result = await resultPromise;
+        if (result === WAD_ERROR_MARKER) {
+            throw new Error("monitor reported an H3W upload error; see the UART terminal");
+        }
+
+        uploadSucceeded = true;
+        els.wadProgress.value = 100;
+        const elapsedSeconds = (performance.now() - startedAt) / 1000;
+        els.wadProgressLabel.textContent = `Accepted in ${elapsedSeconds.toFixed(1)} s`;
+        appendSystem(`IWAD upload accepted in ${elapsedSeconds.toFixed(1)} seconds.`);
+
+        if (launchAfterUpload) {
+            appendSystem("Launching the uploaded Doom image and IWAD with monitor command j.");
+            await writeBytes(new Uint8Array([0x6a]));
+        }
+    } catch (error) {
+        els.wadProgressLabel.textContent = `Failed: ${error.message}`;
+        appendSystem(
+            `IWAD upload failed: ${error.message}. ` +
+            "Make sure the resident monitor prompt is active and the selected memory profile matches the monitor build.");
+    } finally {
+        clearSerialResponseWaiter();
         setSerialOperation(null);
         if (uploadSucceeded) {
             beginScreenSnipTransitionProbe(launchAfterUpload ? 2000 : 750);
@@ -1048,7 +1360,7 @@ function processScreenSnipBytes(bytes) {
 }
 
 function processSerialBytes(bytes) {
-    observeH3dResponse(bytes);
+    observeSerialResponse(bytes);
 
     if (state.screenSnip) {
         processScreenSnipBytes(bytes);
@@ -1223,7 +1535,7 @@ async function disconnect() {
     cancelScheduledScreenSnipProbe();
     stopScreenSnipCapabilityWatch();
     clearScreenSnipProbe();
-    clearH3dWaiter(new Error("serial connection closed"));
+    clearSerialResponseWaiter(new Error("serial connection closed"));
     state.serialOperation = null;
     state.screenSnipCapabilityProtocolKnown = false;
     setScreenSnipCapability("unavailable");
@@ -1512,6 +1824,10 @@ function wireEvents() {
     els.firmwareUploadButton.addEventListener("click", loadConsoleFirmware);
     els.h3dFileInput.addEventListener("change", selectH3dFile);
     els.h3dUploadButton.addEventListener("click", uploadH3dImage);
+    els.wadFileInput.addEventListener("change", selectWadFile);
+    els.wadVisibleName.addEventListener("input", refreshWadImage);
+    els.wadMemoryProfile.addEventListener("change", refreshWadImage);
+    els.wadUploadButton.addEventListener("click", uploadWadImage);
 
     els.commandForm.addEventListener("submit", async (event) => {
         event.preventDefault();
