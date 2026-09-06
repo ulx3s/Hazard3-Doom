@@ -42,6 +42,9 @@ Open `docs/_build/html-hr/index.html` or `docs/_build/html-fr/index.html`.
 
 The repository-root `.readthedocs.yaml` is the build configuration used by Read the Docs. Each translated Read the Docs project should use its matching language and be linked as a translation of the English project. All language projects can use the same repository and branch; `docs/conf.py` selects the translated source tree from `READTHEDOCS_LANGUAGE`.
 
+There was no `.readthedocs.yaml` file for the [0.1.0 Release](https://github.com/ulx3s/Hazard3-Doom/releases/tag/0.1.0) so 
+the `readthedocs` build will fail for that version.
+
 ### Language-scoped search
 
 Each generated Sphinx build is already language-scoped: `docs/conf.py` excludes the physical `fr/` and `hr/` source trees from normal discovery, then substitutes only the translated source selected by `READTHEDOCS_LANGUAGE`. The built-in Sphinx `searchindex.js` therefore contains only the current language.
@@ -59,6 +62,10 @@ For the English parent and every translation project:
 This intentionally keeps the Read the Docs translation/version flyout while using the per-build Sphinx search index for documentation search. The current `.readthedocs.yaml` schema exposes server-side search ranking and ignore rules, but does not provide a repository setting for the dashboard search-modal toggle, so apply this setting to each language project.
 
 Translated human-language prose under `docs/<language>/` is UTF-8 and should use the native characters required by that language. Keep source code, scripts, CI, filenames, command literals, identifiers, paths, protocol strings, and other machine-facing text unchanged unless the underlying interface itself changes.
+
+## Contributing
+
+See the [Contributing Documentation](https://hazard3-doom.readthedocs.io/en/latest/contributing.html).
 
 ## ULX3S Chat and support
 
