@@ -1,15 +1,19 @@
 Hazard3-Doom is a multi-license project.
 
+The applicable SPDX identifier or per-file license notice controls.
+
 Original Hazard3-Doom FPGA hardware designs, gateware, RTL, and related
 hardware-design source explicitly identified as CERN-OHL-W-2.0 are
-licensed under the CERN Open Hardware License Version 2 - Weakly
+licensed under the CERN Open Hardware Licence Version 2 - Weakly
 Reciprocal.
 
-Other project material and third-party components are subject to their
-respective licenses. Bootloader-derived material from the HAD2019/ULX3S/ULX4M
-DFU bootloader retains its upstream per-file licenses and copyright notices;
-it is not relicensed by Hazard3-Doom. See
-LICENSES/HAD2019-Bootloader-NOTICE.md.
+Original software, firmware, scripts, utilities, web code, and documentation
+are licensed according to their SPDX identifiers or accompanying notices.
+Third-party components remain subject to their respective licenses.
+
+Material derived from the HAD2019/ULX3S/ULX4M DFU bootloader retains its
+upstream per-file licenses and copyright notices; Hazard3-Doom does not
+relicense it. See LICENSES/HAD2019-Bootloader-NOTICE.md.
 
 See LICENSING.md for the applicable licensing policy, ATTRIBUTION.md
 for attribution and provenance, and LICENSES/ for license texts and

@@ -1,21 +1,21 @@
-# Hazard3-Doom attribution and acknowledgements
+# Hazard3-Doom Attribution and Acknowledgements
 
-Hazard3-Doom exists because of a large chain of open hardware, open source,
-standards, tools, documentation, testing, reverse engineering, educational
-work, and community support. This file is intentionally broader than a minimum
-legal NOTICE file. It gives credit both to direct code/hardware contributors
-and to people/projects whose work made Hazard3-Doom practical, testable,
-understandable, or accessible.
+Hazard3-Doom builds on a broad ecosystem of open hardware, open-source
+software, standards, tools, documentation, testing, reverse engineering,
+educational work, and community support. This file is intentionally broader
+than a minimal legal notice. It credits direct contributors and the people and
+projects whose work made Hazard3-Doom practical, testable, understandable, or
+accessible.
 
 This is not a statement that every person or organization named below owns
 copyright in Hazard3-Doom. It is also not a statement that any of them endorses
-Hazard3-Doom. For legal obligations, see `LICENSES/`, source-file headers,
-submodule license files, binary-package notices, and Git history.
+Hazard3-Doom. For licensing obligations, see `LICENSING.md`, `LICENSES/`,
+source-file headers, submodule license files, binary-package notices, and Git
+history.
 
-No finite file can name every contributor to every transitive project. All
-contributors to every linked upstream repository are therefore explicitly
-acknowledged by reference even when not individually named below. If somebody
-has been missed, adding their credit is welcomed.
+This file cannot name every contributor to every transitive project. The linked
+upstream repositories and their histories provide the authoritative contributor
+records. Corrections and additions are welcome.
 
 ## Hazard3-Doom project
 
@@ -50,7 +50,7 @@ support.
 Upstream: https://github.com/Wren6991/Hazard3
 Compatible fork: https://github.com/ulx3s/Hazard3/tree/ulx-doom
 
-Hazard3's recursive development/test ecosystem has included Wren6991/libfpga,
+Hazard3's development and test ecosystem has included Wren6991/libfpga,
 Wren6991/fpgascripts, riscv-formal, Embench, RISC-V Architectural Tests,
 riscv-tests, and other projects pinned by particular Hazard3 revisions. Their
 complete contributor communities are acknowledged by reference.
@@ -94,7 +94,7 @@ and later communities made it increasingly portable.
 - Gregor Punchatz - model development.
 - Don Ivan Punchatz - cover illustration.
 - Jay Wilbur - business/production leadership.
-- American McGee, Tim Willits, and John W. Anderson - later original-era DOOM
+- American McGee, Tim Willits, and John W. Anderson - additional original-era DOOM
   level/design contributions associated with Ultimate DOOM lineage.
 - Every other id Software employee, tester, porter, release engineer, and
   contributor associated with the DOOM source and its supported platforms.
@@ -107,8 +107,9 @@ and later communities made it increasingly portable.
 Official source release: https://github.com/id-Software/DOOM
 DoomGeneric: https://github.com/ozkl/doomgeneric
 
-DOOM game data, artwork, audio, names, logos, and trademarks remain distinct
-from the GPL engine source. Hazard3-Doom does not claim ownership of them.
+DOOM game data, artwork, audio, names, logos, and trademarks are not licensed
+by the GPL terms covering the engine source. Hazard3-Doom does not claim
+ownership of them.
 
 ## I2CDriver inspiration
 
@@ -160,7 +161,7 @@ results.
   education, and open-hardware stewardship.
 - FER (University of Zagreb Faculty of Electrical Engineering and Computing) -
   educational collaboration and predecessor-board context.
-- Koncar-INEM - collaboration associated with original ULX3S development.
+- KONCAR-INEM - collaboration associated with original ULX3S development.
 - Marko Zec - ULX2S predecessor work and earlier educational hardware lineage.
 - Everyone who designed revisions, assembled boards, tested hardware, wrote
   examples, documented peripherals, answered questions, and funded/supported
@@ -196,9 +197,9 @@ The ULX3S/ULX4M DFU bootloader lineage comes from the Hackaday Supercon
 and contributors identified from the source headers and Git history include:
 
 - Sylvain Munaut (`smunaut`) - original Hackaday Supercon 2019 badge
-  bootloader author and principal original copyright holder. His bootloader
-  firmware files carry LGPL v3-or-later notices, and much of the associated
-  bootloader RTL carries BSD 3-Clause notices.
+  bootloader author and copyright holder named in most of the original
+  firmware and RTL files. Those firmware files carry LGPL-3.0-or-later
+  notices, and much of the associated RTL carries BSD-3-Clause notices.
 - Jeroen Domburg (`Spritetm`) - author of multiple commits in the original
   bootloader history, including DFU, flash-selection, and bootloader-protection
   changes.
@@ -244,8 +245,7 @@ Vendor acknowledgement is descriptive and does not imply endorsement.
 
 ### Yosys
 
-- Claire Xenia Wolf - creator/original principal author; current source carries
-  her copyrights.
+- Claire Xenia Wolf - creator and original principal author.
 - YosysHQ and the complete Yosys contributor community.
 - Authors of ABC and other third-party synthesis libraries integrated with the
   Yosys flow.
@@ -392,8 +392,8 @@ Hazard3-Doom's browser flasher is specifically indebted to:
 - WebUSB implementers and browser USB-stack maintainers.
 
 This is technical attribution, not a claim that these projects endorse the
-flasher. Source-level derivation must be reviewed separately as described in
-`LICENSES/Web-Flasher-Provenance-NOTICE.md`.
+flasher. Copied or adapted implementations remain governed by their applicable
+licenses, as described in `LICENSES/Web-Flasher-Provenance-NOTICE.md`.
 
 ## Python, image generation, web, and documentation ecosystem
 
@@ -424,7 +424,7 @@ flasher. Source-level derivation must be reviewed separately as described in
   from their distributions.
 - GCC, Clang/LLVM, MSVC, CMake, Ninja, Make, shell environments, package
   maintainers, and all other development tools used to produce/test releases.
-- OpenAI/ChatGPT - interactive design, code-review, documentation, licensing
+- OpenAI and ChatGPT - interactive design, code review, documentation, licensing
   inventory, and development assistance used during parts of project work;
   human maintainers remain responsible for reviewed project changes.
 

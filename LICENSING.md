@@ -2,9 +2,9 @@
 
 Hazard3-Doom is a multi-license open-source and open-hardware project.
 
-The project is intended primarily for education, research, development,
-experimentation, and learning. This statement describes the purpose of the
-project and does not restrict the rights granted by the applicable licenses.
+This document summarizes the project's licensing policy. The applicable SPDX
+identifier, per-file license notice, and corresponding unmodified license text
+control.
 
 ## Original Hazard3-Doom open hardware and gateware
 
@@ -17,11 +17,8 @@ The complete, unmodified license text is:
 
     LICENSES/CERN-OHL-W-2.0.txt
 
-Files containing:
-
-    SPDX-License-Identifier: CERN-OHL-W-2.0
-
-are explicitly licensed under those terms.
+Files containing `SPDX-License-Identifier: CERN-OHL-W-2.0` are explicitly
+licensed under those terms.
 
 ## Original Hazard3-Doom software
 
@@ -29,7 +26,7 @@ Original Hazard3-Doom software, firmware, scripts, utilities, web application
 code, and documentation are governed by the license identified by their SPDX
 identifier or accompanying license notice.
 
-Where a file is identified as Apache-2.0, the applicable license text is:
+For a file identified as Apache-2.0, the applicable license text is:
 
     LICENSES/Apache-2.0.txt
 
@@ -40,8 +37,9 @@ Third-party material remains subject to its respective upstream license.
 In particular:
 
 - Hazard3 upstream material remains subject to its applicable Apache-2.0 terms.
-- Doom and DoomGeneric source and derivative material remain subject to their
-  applicable GPL terms.
+- The DOOM engine source, DoomGeneric source, and derivative material remain
+  subject to their applicable GNU GPL terms. Those terms do not license DOOM
+  game data, artwork, audio, names, logos, or trademarks.
 - dfu-util convenience binaries in `bin/` remain subject to the applicable
   GNU GPL terms identified by the exact upstream release; see
   `LICENSES/dfu-util-NOTICE.md` and `LICENSES/dfu-util-COPYING.txt`.
@@ -55,8 +53,7 @@ In particular:
 - Other third-party source, binaries, libraries, benchmarks, tools, and assets
   remain subject to their respective upstream licenses.
 
-No Hazard3-Doom license declaration should be interpreted as relicensing
-third-party material.
+No Hazard3-Doom license declaration relicenses third-party material.
 
 See LICENSES/, ATTRIBUTION.md, source-file headers, submodule license files,
 binary-package notices, and Git history for additional information.
