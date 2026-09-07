@@ -5,6 +5,9 @@ Hazard3-Doom uključuje pregledničku konzolu bez dodatnih ovisnosti u direktori
 ``web/``. Koristi preglednički Web Serial API za izravnu komunikaciju s UART-om
 pločice i može zatražiti i snimku zaslona od podržanih HDMI aplikacija.
 
+Za potpuni tijek web alata, uključujući H3D/IWAD prijenos i učitavanje
+firmwarea konzole, pogledajte :doc:`web-tool`.
+
 Ista web-aplikacija sadrži i zaseban WebUSB FPGA programator za ULX3S ``US1``
 FT231X JTAG sučelje. Web Serial i WebUSB neovisni su transporti: UART konzola
 ostaje na svojem serijskom adapteru, dok FPGA programator komunicira s JTAG-om.

@@ -39,3 +39,5 @@ Read the Docs publishing
 ------------------------
 
 The repository-root ``.readthedocs.yaml`` points Read the Docs at ``docs/conf.py`` and installs ``docs/requirements.txt``. After the files are committed, import the GitHub repository into Read the Docs and select the branch/version to publish.
+
+See additional notes in the `docs README file <https://github.com/ulx3s/Hazard3-Doom/blob/main/docs/README.md>`

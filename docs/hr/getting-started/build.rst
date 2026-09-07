@@ -26,8 +26,10 @@ Uobičajeni build mora zadovoljiti sva ograničenja takta:
 
    ./scripts/build-ulx4m-ld-doom.sh
 
-Build zadano koristi seed 83 s HeAP ``timingweight=30``. Povijesna, verzijski
-spremljena zamrznuta kontrolna točka seed 2 također je prošla potpunu DDR kvalifikaciju na
+Build koristi zajedničke ULX4M-LD postavke definirane u
+``scripts/build-ecp5-bitstream-common.sh`` i sažete u
+:doc:`../reference/board-profiles`. Povijesna, verzijski spremljena zamrznuta
+kontrolna točka seed 2 također je prošla potpunu DDR kvalifikaciju na
 ULX4M-LD pločici s Micron memorijom. Novi potpuni build ipak stvara novi
 netlist, pa za release artifact ponovno pokrenite timing sweep i hardverske
 testove. ``ALLOW_TIMING_FAILURE=1`` rezerviran je za izričite ULX4M-LD sweep

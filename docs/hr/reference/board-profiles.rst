@@ -35,6 +35,22 @@ Monitor, povezana Doom slika i SDRAM memorijska mapa moraju se slagati oko
 memorijskog profila. Potpuni omotači za build pločica automatski postavljaju
 profil i takt specifičan za cilj.
 
+Zadane nextpnr postavke routanja
+--------------------------------
+
+Omotači za pločice uzimaju zadane postavke routanja iz jedne zajedničke
+implementacije, ``scripts/build-ecp5-bitstream-common.sh``. Trenutačne se
+vrijednosti uključuju izravno iz te datoteke kako dokumentacija ne bi održavala
+drugu kopiju:
+
+.. literalinclude:: ../../scripts/build-ecp5-bitstream-common.sh
+   :language: bash
+   :start-at: ULX3S_85F_DEFAULT_NEXTPNR_SEED=
+   :end-at: ULX4M_LD_85F_DEFAULT_NEXTPNR_HEAP_TIMINGWEIGHT=
+
+``NEXTPNR_SEED`` i dalje može nadjačati zadani seed odabrane pločice za izričiti
+route. Ove su vrijednosti release baseline, a ne trajni optimum.
+
 Trenutačna FPGA provjera
 ------------------------
 
@@ -52,19 +68,24 @@ jamstva timinga:
      - Routed rezultat
      - Stanje
    * - ULX3S 85F
-     - 55
-     - ``clk_sys`` 51.77 MHz
+     - 11
+     - ``clk_sys`` 52.24 MHz
      - PASS pri 50 MHz
    * - ULX3S 12F
-     - 65
-     - ``clk_sys`` 42.11 MHz
+     - 82
+     - ``clk_sys`` 42.70 MHz
      - PASS pri 40 MHz
    * - ULX4M-LD 85F
-     - 2
-     - ``clk_sys`` 43.94 MHz; LiteDRAM korisnički port 67.81 MHz
-     - PASS pri 40 MHz / 60 MHz i hardverski kvalificiran DDR
+     - 83
+     - ``clk_sys`` 43.63 MHz; LiteDRAM korisnički port 67.51 MHz
+     - PASS pri 40 MHz / 60 MHz; odabrani release route
 
-Kvalificirana ULX4M-LD kontrolna točka koristi zamrznuti netlist, seed 2 i HeAP
+Ovi release-route zapisi namjerno zadržavaju seed jer je on dio podataka o
+podrijetlu timing rezultata. Same zadane vrijednosti održava zajednička build
+skripta iznad.
+
+Hardverski kvalificirana ULX4M-LD kontrolna točka koristi zamrznuti netlist,
+seed 2 i HeAP
 ``timingweight=30``. Hardverski testirani bitstream ima SHA256
 ``294602982dfc4a9906961f2e8b6f43de925d8c11a7e5e6bb0f5e392965a868de``.
 Pločica s Micron memorijom prošla je potpunu DDR kvalifikaciju, heap stress,

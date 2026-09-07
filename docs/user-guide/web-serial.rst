@@ -4,6 +4,8 @@ Web Serial Console and HDMI Screen Snip
 Hazard3-Doom includes a dependency-free browser console in the ``web/``
 directory. It uses the browser Web Serial API to talk directly to the board's
 UART and can also request a screen snip from supported HDMI applications.
+For the complete browser device-tool workflow, including H3D/IWAD upload and
+console firmware loading, see :doc:`web-tool`.
 
 The same web application also contains a separate WebUSB FPGA programmer for
 the ULX3S ``US1`` FT231X JTAG interface. Web Serial and WebUSB are independent

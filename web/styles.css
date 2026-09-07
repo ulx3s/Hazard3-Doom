@@ -230,7 +230,7 @@ p {
 .layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) clamp(300px, 24vw, 380px);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     gap: 1rem;
     min-height: 0;
     height: 100%;
@@ -246,11 +246,13 @@ p {
 }
 
 .serial-panel,
+.upload-panel,
 .controls-panel {
     padding: 1rem;
 }
 
-.serial-panel {
+.serial-panel,
+.upload-panel {
     grid-column: 1 / -1;
 }
 
@@ -310,11 +312,73 @@ p {
     pointer-events: none;
 }
 
+.serial-panel-summary,
+.upload-panel-summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.serial-panel-summary::-webkit-details-marker,
+.upload-panel-summary::-webkit-details-marker {
+    display: none;
+}
+
+.serial-panel-summary::before,
+.upload-panel-summary::before {
+    content: "+";
+    flex: 0 0 auto;
+    width: 1rem;
+    margin-top: 0.2rem;
+    color: var(--accent);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 800;
+}
+
+.serial-panel[open] > .serial-panel-summary::before,
+.upload-panel[open] > .upload-panel-summary::before {
+    content: "-";
+}
+
+.serial-panel-summary:focus-visible,
+.upload-panel-summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.serial-panel-summary h2,
+.upload-panel-summary h2 {
+    margin: 0;
+}
+
+.serial-panel-summary p,
+.upload-panel-summary p {
+    margin-top: 0.25rem;
+}
+
+.serial-panel-body,
+.upload-panel-body {
+    margin-top: 0.7rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.7rem;
+}
+
+.upload-panel-body > .flasher-section:first-child {
+    margin-top: 0;
+}
+
+.serial-connection-actions {
+    margin-top: 0.75rem;
+}
+
 .settings-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(120px, 1fr));
+    grid-template-columns: repeat(6, minmax(110px, 1fr));
     gap: 0.75rem;
-    margin-top: 1rem;
+    margin-top: 0;
 }
 
 label > span,
@@ -554,7 +618,7 @@ input[type="text"] {
 
     .layout {
         grid-template-columns: 1fr;
-        grid-template-rows: auto auto auto;
+        grid-template-rows: auto auto auto auto;
         height: auto;
         overflow: visible;
         padding-bottom: 1rem;
@@ -604,8 +668,14 @@ input[type="text"] {
     }
 
     .settings-grid,
-    .button-grid {
+    .button-grid,
+    .wad-options {
         grid-template-columns: 1fr;
+    }
+
+    .serial-panel-summary,
+    .upload-panel-summary {
+        align-items: flex-start;
     }
 
     .terminal {
@@ -633,17 +703,18 @@ input[type="text"] {
         font-size: 0.75rem;
     }
 
-    .serial-panel {
+    .serial-panel,
+    .upload-panel {
         padding: 0.65rem 0.8rem;
     }
 
-    .serial-panel .panel-heading p {
+    .serial-panel-summary p,
+    .upload-panel-summary p {
         display: none;
     }
 
     .settings-grid {
         gap: 0.55rem;
-        margin-top: 0.55rem;
     }
 
     select,
@@ -708,8 +779,8 @@ input[type="text"] {
     color: var(--terminal-dim);
 }
 
-/* ULX3S WebUSB/JTAG FPGA programmer. Kept inside the serial panel so the
- * existing desktop terminal/control grid does not gain another permanent row. */
+/* Device uploader accordions. These live inside the collapsible upload panel
+ * so the terminal/control row retains the remaining viewport height. */
 .flasher-section {
     margin-top: 0.85rem;
     border: 1px solid #45685a;
@@ -841,6 +912,17 @@ input[type="text"] {
 
 .svf-picker small {
     color: var(--muted);
+}
+
+.wad-options {
+    display: grid;
+    grid-template-columns: minmax(140px, 0.8fr) minmax(220px, 1.2fr);
+    gap: 0.65rem;
+    margin-top: 0.35rem;
+}
+
+.wad-options label > span {
+    margin-bottom: 0.3rem;
 }
 
 .flasher-checklist span {

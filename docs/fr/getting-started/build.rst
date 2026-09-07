@@ -26,8 +26,10 @@ ULX4M-LD 85F, cartographie logicielle 64 Mio, Hazard3 à 40 MHz et LiteDRAM à
 
    ./scripts/build-ulx4m-ld-doom.sh
 
-Le build utilise par défaut le seed 83 avec HeAP ``timingweight=30``. Le point
-de contrôle historique seed 2 figé et versionné a également réussi la qualification DDR
+Le build utilise les paramètres ULX4M-LD communs définis dans
+``scripts/build-ecp5-bitstream-common.sh`` et résumés dans
+:doc:`../reference/board-profiles`. Le point de contrôle historique seed 2 figé
+et versionné a également réussi la qualification DDR
 complète sur une carte ULX4M-LD équipée de mémoire Micron. Un nouveau build
 complet crée toutefois un nouveau netlist : relancez le sweep de timing et les
 tests matériels pour tout artifact de release. ``ALLOW_TIMING_FAILURE=1`` est

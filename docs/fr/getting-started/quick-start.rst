@@ -61,7 +61,24 @@ les préférez. Pour une installation autonome permanente, voir
 4. Charger Doom via UART
 ------------------------
 
-Fermez tout programme de terminal qui possède déjà le port UART, puis téléversez l'image Doom :
+L'outil web peut effectuer les deux transferts Doom sans quitter la console du
+navigateur. Développez **Serial connection**, connectez l'UART de la carte et
+vérifiez que l'invite ``>`` du moniteur résident est active. Développez ensuite
+**Device uploading** :
+
+#. Ouvrez **Doom H3D uploader**, sélectionnez
+   ``build/ulx3s/doom-image/hazard3-doom.h3d`` puis **Upload H3D**.
+#. Ouvrez **Doom IWAD uploader**, sélectionnez un fichier ``.wad`` obtenu
+   légalement, choisissez le profil mémoire correspondant au moniteur résident
+   puis **Upload IWAD**.
+#. Activez **Launch with ``j`` after upload** dans le chargeur IWAD si Doom doit
+   démarrer immédiatement après l'acceptation de l'IWAD.
+
+Pour le flux complet et la table des profils mémoire, voir
+:doc:`../user-guide/web-tool`.
+
+Les chargeurs en ligne de commande restent disponibles. Fermez d'abord tout
+terminal ou connexion navigateur qui possède le port UART, puis exécutez :
 
 .. code-block:: powershell
 
@@ -69,16 +86,13 @@ Fermez tout programme de terminal qui possède déjà le port UART, puis télév
        .\build\doom-image\hazard3-doom.h3d `
        --port COM7
 
-Téléversez ensuite un IWAD obtenu légalement :
-
-.. code-block:: powershell
-
    py .\doom\upload-wad.py `
        C:\path\to\DOOM.WAD `
        --port COM7 `
        --launch
 
-Le nom du port UART n'est qu'un exemple ; utilisez le port attribué à votre carte.
+Le nom du port UART n'est qu'un exemple ; utilisez le port attribué à votre
+carte.
 
 5. Vérifier le démarrage
 ------------------------

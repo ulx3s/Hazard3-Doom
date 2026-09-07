@@ -36,8 +36,9 @@ memorijsku mapu međusobno usklađenima.
 ``scripts/build-ulx4m-ld-doom.sh``
    Potpuni build za ULX4M-LD 85F. Koristi softversku mapu od 64 MiB pri 40 MHz i prije
    builda monitora, ugrađene boot slike, FPGA bitstreama i Doom slike provjerava
-   potrebne generirane LiteDRAM izvore. Release build zadano koristi seed 83 s
-   HeAP timingweightom 30 i mora zadovoljiti sva ograničenja takta. Novi netlist
+   potrebne generirane LiteDRAM izvore. Release build koristi ULX4M-LD postavke
+   iz ``build-ecp5-bitstream-common.sh`` i mora zadovoljiti sva ograničenja
+   takta. Novi netlist
    mora se ponovno routati i hardverski kvalificirati. Koristite
    ``ALLOW_TIMING_FAILURE=1`` samo za izričite ULX4M-LD sweep eksperimente.
 

@@ -35,6 +35,21 @@ The monitor, linked Doom image, and SDRAM memory map must agree on the memory
 profile. Complete board build wrappers set their target-specific profile and
 clock automatically.
 
+Default nextpnr routing settings
+--------------------------------
+
+The board wrappers obtain their routing defaults from one common implementation,
+``scripts/build-ecp5-bitstream-common.sh``. The current assignments are included
+directly from that file so the documentation does not maintain another copy:
+
+.. literalinclude:: ../../scripts/build-ecp5-bitstream-common.sh
+   :language: bash
+   :start-at: ULX3S_85F_DEFAULT_NEXTPNR_SEED=
+   :end-at: ULX4M_LD_85F_DEFAULT_NEXTPNR_HEAP_TIMINGWEIGHT=
+
+``NEXTPNR_SEED`` can still override the selected board default for an explicit
+route. Treat the defaults as release baselines, not permanent optima.
+
 Current FPGA validation
 -----------------------
 
@@ -52,20 +67,24 @@ portable timing guarantees.
      - Routed result
      - Status
    * - ULX3S 85F
-     - 55
-     - ``clk_sys`` 51.77 MHz
+     - 11
+     - ``clk_sys`` 52.24 MHz
      - PASS at 50 MHz
    * - ULX3S 12F
-     - 65
-     - ``clk_sys`` 42.11 MHz
+     - 82
+     - ``clk_sys`` 42.70 MHz
      - PASS at 40 MHz
    * - ULX4M-LD 85F
-     - 2
-     - ``clk_sys`` 43.94 MHz; LiteDRAM user 67.81 MHz
-     - PASS at 40 MHz / 60 MHz and hardware-qualified DDR
+     - 83
+     - ``clk_sys`` 43.63 MHz; LiteDRAM user 67.51 MHz
+     - PASS at 40 MHz / 60 MHz; selected release route
 
-The current ULX4M-LD checkpoint is substantially stronger than the older
-``ALLOW_TIMING_FAILURE`` development state. The exact frozen netlist was:
+These release-route rows intentionally keep the seed explicit because it is
+part of the timing result's provenance. The default values themselves are
+owned by the common build script above.
+
+The hardware-qualified ULX4M-LD checkpoint is substantially stronger than the
+older ``ALLOW_TIMING_FAILURE`` development state. The exact frozen netlist was:
 
 .. code-block:: text
 

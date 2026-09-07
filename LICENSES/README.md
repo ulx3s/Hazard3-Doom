@@ -10,13 +10,13 @@ by its own copyright notices, SPDX identifiers, upstream license, and Git
 history.
 
 Hazard3-Doom is a multi-license project. The root `LICENSE` provides a concise
-licensing overview, while `../LICENSING.md` defines the applicable project
+licensing overview, while [../LICENSING.md](../LICENSING.md) defines the applicable project
 licensing policy and scope.
 
 The presence of a license text in this directory does not apply that license
 to unrelated project or third-party material.
 
-See `../ATTRIBUTION.md` for broad acknowledgements.
+See [../ATTRIBUTION.md](../ATTRIBUTION.md) for broad acknowledgements.
 
 ## Core source/component notices
 

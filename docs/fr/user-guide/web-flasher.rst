@@ -5,6 +5,9 @@ Hazard3-Doom comprend un programmateur FPGA ULX3S dans l'application ``web/``.
 Il programme directement le FPGA ECP5 via l'interface JTAG FT231X ``US1`` de
 l'ULX3S à l'aide de WebUSB.
 
+Pour une vue d'ensemble de l'outil web complet et de ses autres chemins de
+téléversement, voir :doc:`web-tool`.
+
 Le flasher est distinct de la console UART :
 
 .. code-block:: text

@@ -40,8 +40,9 @@ l'image Doom et la cartographie mémoire SDRAM cohérents.
    Build complet ULX4M-LD 85F. Il utilise la cartographie logicielle 64 Mio à 40 MHz et
    vérifie les sources LiteDRAM générées requises avant de construire le
    moniteur, l'image de boot embarquée, le bitstream FPGA et l'image Doom. Le
-   build de release utilise par défaut le seed 83 avec HeAP timingweight 30 et
-   doit respecter toutes les contraintes d'horloge. Un nouveau netlist doit être
+   build de release utilise les paramètres ULX4M-LD de
+   ``build-ecp5-bitstream-common.sh`` et doit respecter toutes les contraintes
+   d'horloge. Un nouveau netlist doit être
    routé et qualifié sur le matériel. Réservez ``ALLOW_TIMING_FAILURE=1`` aux
    expériences explicites de sweep ULX4M-LD.
 

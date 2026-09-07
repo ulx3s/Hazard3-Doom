@@ -57,7 +57,8 @@ Počnite ovdje
 * :doc:`getting-started/tiny-tapeout-ulx3s` - gradite Tiny Tapeout projekte za ULX3S ECP5 lokalno ili pomoću GitHub Actionsa.
 * :doc:`hardware/ulx4m/index` - istražite ULX4M hardver: FPGA, satove, SDR/DDR3, flash, video, SD, SerDes, pin ograničenja i revizije.
 * :doc:`reference/timing-sweeps` - pokrenite lokalne/GitHub ECP5 sweepove i tumačite live timing rezultate.
-* :doc:`user-guide/web-flasher` - programirajte FPGA SRAM na ULX3S izravno iz Chromea/Edgea putem WebUSB-a.
+* :doc:`user-guide/web-tool` - koristite web alat za UART, FPGA programiranje, firmware konzole, H3D/IWAD prijenos i screen snip.
+* :doc:`user-guide/web-flasher` - detaljni vodič za ULX3S FPGA SRAM programiranje putem WebUSB-a.
 * :doc:`user-guide/sd-card` - podesite samostalno hladno pokretanje s micro-SD kartice.
 * :doc:`user-guide/i2cdriver` - skenirajte i pregledajte SAO I2C sabirnicu preko HDMI-ja.
 * :doc:`user-guide/jtag-debugging` - otklanjajte pogreške u Hazard3 putem OpenOCD/GDB-a ili VisualGDB-a.

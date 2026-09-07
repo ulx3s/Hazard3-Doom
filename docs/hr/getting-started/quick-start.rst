@@ -59,7 +59,23 @@ instalaciju pogledajte :doc:`programming` i :doc:`../user-guide/sd-card`.
 4. Učitajte Doom putem UART-a
 -----------------------------
 
-Zatvorite svaki terminalski program koji već koristi UART priključak, zatim prenesite Doom sliku:
+Web alat može obaviti oba Doom prijenosa bez napuštanja pregledničke konzole.
+Proširite **Serial connection**, spojite UART pločice i provjerite da je aktivan
+``>`` prompt rezidentnog monitora. Zatim proširite **Device uploading**:
+
+#. Otvorite **Doom H3D uploader**, odaberite
+   ``build/ulx3s/doom-image/hazard3-doom.h3d`` i kliknite **Upload H3D**.
+#. Otvorite **Doom IWAD uploader**, odaberite zakonito pribavljenu ``.wad``
+   datoteku, odaberite memorijski profil koji odgovara rezidentnom monitoru i
+   kliknite **Upload IWAD**.
+#. Uključite **Launch with ``j`` after upload** u IWAD uploaderu ako se Doom treba
+   pokrenuti odmah nakon što monitor prihvati IWAD.
+
+Za cijeli web postupak i tablicu memorijskih profila pogledajte
+:doc:`../user-guide/web-tool`.
+
+Naredbeni uploaderi i dalje su dostupni. Najprije zatvorite terminal ili
+pregledničku vezu koja koristi UART port, a zatim pokrenite:
 
 .. code-block:: powershell
 
@@ -67,16 +83,12 @@ Zatvorite svaki terminalski program koji već koristi UART priključak, zatim pr
        .\build\doom-image\hazard3-doom.h3d `
        --port COM7
 
-Zatim prenesite zakonski pribavljen IWAD:
-
-.. code-block:: powershell
-
    py .\doom\upload-wad.py `
        C:\path\to\DOOM.WAD `
        --port COM7 `
        --launch
 
-Naziv UART priključka samo je primjer; upotrijebite priključak dodijeljen vašoj pločici.
+Naziv UART porta samo je primjer; upotrijebite port dodijeljen pločici.
 
 5. Provjerite pokretanje
 ------------------------

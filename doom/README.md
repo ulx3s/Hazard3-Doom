@@ -31,7 +31,7 @@ See the repository root `README.md` for setup, build, upload, memory-map, and co
 
 ### Discord channel
 
-- [https://discord.gg/qwMUk6W](https://discord.gg/qwMUk6W) (problems/question/general chat)
+- [https://discord.gg/qwMUk6W](https://discord.gg/qwMUk6W) (problems/question/general chat); [#hazard3-doom](https://discord.com/channels/690209441953480758/1546280673822642186)
 
 ### Gitter channel
 
