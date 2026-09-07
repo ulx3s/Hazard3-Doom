@@ -35,9 +35,10 @@ memory map aligned.
 ``scripts/build-ulx4m-ld-doom.sh``
    Complete ULX4M-LD 85F build. It uses the 64 MiB software map at 40 MHz and
    checks the selected generated LiteDRAM sources before building the monitor,
-   embedded boot image, FPGA bitstream, and Doom image. The release build
-   defaults to seed 83 with HeAP timingweight 30 and must close every required
-   clock. The historical frozen 40 MHz Hazard3 / 60 MHz LiteDRAM seed-2
+   embedded boot image, FPGA bitstream, and Doom image. The release build uses
+   the ULX4M-LD defaults from ``build-ecp5-bitstream-common.sh`` and must close
+   every required clock. The historical frozen 40 MHz Hazard3 / 60 MHz LiteDRAM
+   seed-2
    checkpoint is hardware-qualified. A fresh complete build creates a new netlist
    and must be rerouted and hardware-qualified; do not assume the historical
    seed remains valid. ``ALLOW_TIMING_FAILURE=1`` is for explicit ULX4M-LD
@@ -372,9 +373,9 @@ Repository hygiene and generated inventory
    PowerShell parsing, generated seed-matrix checks, sweep-dispatch checks, and
    repository-policy checks. With no options it avoids builds and hardware.
    ``--integration`` additionally executes the complete builds and routed
-   sample sweeps for all three ECP5 targets. The sample defaults to two
-   target-specific timing-passing seeds: 11/178 for ULX3S 85F, 82/37 for ULX3S
-   12F, and 83/45 for ULX4M-LD. Use the target-specific
+   sample sweeps for all three ECP5 targets. The integration seed lists are
+   defined in ``test-scripts.sh``; they are separate from the board build
+   defaults in ``build-ecp5-bitstream-common.sh``. Use the target-specific
    ``SCRIPT_TEST_*_SEEDS`` variables or ``SCRIPT_TEST_SWEEP_SEEDS`` to override
    all three lists; ``SCRIPT_TEST_SWEEP_JOBS`` controls concurrency. A sweep
    that completes without a timing-passing sampled seed is reported as a

@@ -35,6 +35,23 @@ Le moniteur, l'image Doom liée et la cartographie mémoire SDRAM doivent utilis
 le même profil mémoire. Les wrappers de build complets pour chaque carte règlent
 automatiquement le profil et l'horloge propres à leur cible.
 
+Paramètres de routage nextpnr par défaut
+----------------------------------------
+
+Les wrappers des cartes prennent leurs paramètres de routage par défaut dans
+une seule implémentation commune, ``scripts/build-ecp5-bitstream-common.sh``.
+Les affectations actuelles sont incluses directement depuis ce fichier afin que
+la documentation n'en conserve pas une seconde copie :
+
+.. literalinclude:: ../../scripts/build-ecp5-bitstream-common.sh
+   :language: bash
+   :start-at: ULX3S_85F_DEFAULT_NEXTPNR_SEED=
+   :end-at: ULX4M_LD_85F_DEFAULT_NEXTPNR_HEAP_TIMINGWEIGHT=
+
+``NEXTPNR_SEED`` peut toujours remplacer la valeur par défaut de la carte pour
+un routage explicite. Ces valeurs sont des références de release, pas des
+optima permanents.
+
 Validation FPGA actuelle
 ------------------------
 
@@ -52,19 +69,24 @@ correspondant ; ces valeurs ne sont pas des garanties de timing portables :
      - Résultat routé
      - État
    * - ULX3S 85F
-     - 55
-     - ``clk_sys`` 51.77 MHz
+     - 11
+     - ``clk_sys`` 52.24 MHz
      - PASS à 50 MHz
    * - ULX3S 12F
-     - 65
-     - ``clk_sys`` 42.11 MHz
+     - 82
+     - ``clk_sys`` 42.70 MHz
      - PASS à 40 MHz
    * - ULX4M-LD 85F
-     - 2
-     - ``clk_sys`` 43.94 MHz ; port utilisateur LiteDRAM 67.81 MHz
-     - PASS à 40 MHz / 60 MHz et DDR qualifiée sur le matériel
+     - 83
+     - ``clk_sys`` 43.63 MHz ; port utilisateur LiteDRAM 67.51 MHz
+     - PASS à 40 MHz / 60 MHz ; route sélectionnée pour la release
 
-Le point de contrôle ULX4M-LD qualifié utilise un netlist figé, le seed 2 et
+Ces lignes de validation de release conservent volontairement le seed car il
+fait partie de la provenance du résultat de timing. Les valeurs par défaut
+elles-mêmes sont gérées par le script de build commun ci-dessus.
+
+Le point de contrôle ULX4M-LD qualifié sur le matériel utilise un netlist
+figé, le seed 2 et
 HeAP ``timingweight=30``. Le bitstream testé sur le matériel a pour SHA256
 ``294602982dfc4a9906961f2e8b6f43de925d8c11a7e5e6bb0f5e392965a868de``.
 La carte équipée de mémoire Micron a réussi la suite complète de qualification

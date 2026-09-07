@@ -145,14 +145,15 @@ physical part number to
 The editable LiteDRAM inputs are the checked-in YAML files beneath that
 directory's `configs/` tree.
 
-The current build defaults are:
+The authoritative ECP5 routing defaults are defined once in
+`scripts/build-ecp5-bitstream-common.sh`; the board-specific wrappers consume
+those shared values rather than carrying their own seed literals. The release
+validation records in `docs/reference/board-profiles.rst` preserve the exact
+seed and measured timing for each selected route.
 
- - ULX3S 85F seed 82 
- - ULX3S 12F seed 11
- - ULX4M-LD seed 83, HeAP, timingweight 30
-
-The checked-in sweep summaries record the current timing results. The frozen ULX4M-LD seed-2
-checkpoint is also hardware-qualified on the Micron-populated board, including
+The checked-in sweep summaries record the current timing results. The frozen
+ULX4M-LD seed-2 checkpoint is also hardware-qualified on the Micron-populated
+board, including
 the complete DDR qualification, heap stress, Doom smoke, and RV32-from-DDR
 execution tests. See
 `docs/reference/board-profiles.rst` and `docs/reference/timing-sweeps.rst` for
@@ -200,8 +201,9 @@ ULX4M-LD 85F:
 ./scripts/build-ulx4m-ld-doom.sh
 ```
 
-The normal complete-build route uses seed `83` with `HeAP timingweight 30` and must
-close every required clock. A complete rebuild can change the synthesized
+The normal complete-build routes use the target-specific defaults from
+`scripts/build-ecp5-bitstream-common.sh` and must close every required clock.
+A complete rebuild can change the synthesized
 netlist when the resident monitor or generated LiteDRAM profile changes, so
 rerun timing and DDR qualification for a release artifact rather than assuming
 that a seed remains valid. `ALLOW_TIMING_FAILURE=1` is reserved for explicit
@@ -502,7 +504,7 @@ legally and keep it outside Git or under the ignored `wads/` directory.
 
 ### Discord channel
 
-- [https://discord.gg/qwMUk6W](https://discord.gg/qwMUk6W) (problems/question/general chat)
+- [https://discord.gg/qwMUk6W](https://discord.gg/qwMUk6W) (problems/question/general chat); [#hazard3-doom](https://discord.com/channels/690209441953480758/1546280673822642186)
 
 ### Gitter channel
 

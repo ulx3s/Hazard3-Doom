@@ -58,11 +58,11 @@ Current primary profiles are:
 The monitor, FPGA configuration, Doom image, and SDRAM map must use compatible
 settings. Do not mix 32 MiB and 64 MiB software images.
 
-The current build defaults are seed 11 for ULX3S 85F, seed `82` for ULX3S 12F,
-and seed `83` for ULX4M-LD. ULX4M-LD also defaults to `HeAP timingweight 30`, the
-simplest qualified setting from the 40/60 MHz ablation. These are convenience
-baselines, not permanent optima: rerun a seed sweep after placement-sensitive
-RTL, memory, video, clock, or toolchain changes.
+The authoritative board-specific nextpnr defaults are kept together in
+`build-ecp5-bitstream-common.sh`. The board wrappers consume those shared
+settings, so this README does not maintain a second copy of the seed values.
+They are convenience baselines, not permanent optima: rerun a seed sweep after
+placement-sensitive RTL, memory, video, clock, or toolchain changes.
 
 ## Build Scripts
 
@@ -73,7 +73,7 @@ RTL, memory, video, clock, or toolchain changes.
 - `build-ulx3s-12f-bitstream.sh` - ULX3S 12F entry point for the shared ECP5 flow. Defaults to `HAZARD3_MEMORY_PROFILE=32m`.
 - `build-ulx3s-12f-doom.sh` - Complete ULX3S 12F build. Uses a 40 MHz Hazard3 clock, defaults to the 32 MiB map, and intentionally accepts only `HAZARD3_DOOM_HDMI_RESOLUTION=320x200`.
 - `build-ulx4m-ld-bitstream.sh` - ULX4M-LD 85F entry point for the shared ECP5 flow. Supports `SKIP_SYNTH=1` for routing an existing frozen JSON without invoking Make/Yosys.
-- `build-ulx4m-ld-doom.sh` - Complete ULX4M-LD 85F build using the 64 MiB map at 40 MHz, including LiteDRAM inputs and the embedded resident monitor under `build/ulx4m-ld/`. The default route uses seed 83 with HeAP timingweight 30.
+- `build-ulx4m-ld-doom.sh` - Complete ULX4M-LD 85F build using the 64 MiB map at 40 MHz, including LiteDRAM inputs and the embedded resident monitor under `build/ulx4m-ld/`. The default route settings come from `build-ecp5-bitstream-common.sh`.
 - `build-xpack.cmd` - Native Windows monitor build using the repository xPack RISC-V GCC installation. Supports `build`, `clean`, and `rebuild` plus memory-profile and clock arguments.
 - `make-boot-hex.py` - Converts the monitor binary into the hexadecimal initialization format consumed by FPGA boot memory.
 
@@ -286,8 +286,10 @@ Fast validation and the longer integration sample are separate:
 ./scripts/test-scripts.sh --integration --dry-run
 ```
 
-The integration sample defaults to board-specific timing-passing seeds: `11` and
-`178` for ULX3S 85F, `82` and `37` for ULX3S 12F, and 83 and 45 for ULX4M-LD. Override
+The integration sample has its own two-seed timing-passing lists, defined in
+`test-scripts.sh`: `11` and `178` for ULX3S 85F, `82` and `37` for ULX3S 12F,
+and `83` and `45` for ULX4M-LD. These are integration-test inputs, not a second
+definition of the board build defaults. Override
 one list with `SCRIPT_TEST_ULX3S_85F_SEEDS`,
 `SCRIPT_TEST_ULX3S_12F_SEEDS`, or `SCRIPT_TEST_ULX4M_LD_SEEDS`.
 `SCRIPT_TEST_SWEEP_SEEDS` overrides all three lists, and
